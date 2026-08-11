@@ -6,29 +6,29 @@
 
 ## Project Overview
 
-CampusFix is a full-stack web application designed to improve the process of reporting and managing maintenance issues within a university campus.
+CampusFix is a full-stack web application designed to improve the process of reporting, managing and tracking maintenance issues within a university campus.
 
-The system allows students and university staff to submit maintenance requests and track their progress. Administrators can review and assign requests to maintenance staff, while maintenance staff can update repair progress and completion information.
+Students and university staff can submit maintenance requests and monitor their progress. Administrators can review and assign requests to maintenance staff, while maintenance staff can update repair progress and completion information.
 
-The goal of CampusFix is to provide a centralised and transparent platform that improves communication between users and maintenance teams.
+The project aims to provide a centralised, transparent and efficient maintenance management platform for the university community.
 
 ## Problem Statement
 
 Maintenance issues such as damaged facilities, electrical faults, plumbing problems and air-conditioning failures commonly occur on campus.
 
-Existing reporting methods may be fragmented and inefficient. Users may not know whether a maintenance issue has been received, assigned or completed, while maintenance teams may find it difficult to organise and prioritise requests.
+Current reporting methods may be fragmented or inefficient. Users may not know whether an issue has been received, assigned or resolved, while maintenance teams may find it difficult to organise requests and communicate progress clearly.
 
-CampusFix addresses this problem by providing a single platform for submitting, managing and tracking maintenance requests.
+CampusFix addresses this problem by providing one central platform for submitting, managing and tracking maintenance requests.
 
-## Main Features
+## Key Requirements and Main Features
 
-The main features of CampusFix include:
+The main requirements of CampusFix are:
 
 - User registration and login
 - Role-based access for users, maintenance staff and administrators
 - Maintenance request submission
-- Maintenance request status tracking
-- Request assignment to maintenance staff
+- Request status tracking
+- Assignment of requests to maintenance staff
 - Repair progress updates
 - Search and filtering of maintenance requests
 - Rating and feedback after maintenance is completed
@@ -45,11 +45,12 @@ A maintenance request will follow a simple workflow:
 The main goals of CampusFix are to:
 
 - Centralise campus maintenance requests in one system
+- Make maintenance reporting easier for students and staff
 - Allow users to clearly track repair progress
 - Help administrators organise and assign maintenance work
 - Improve communication between users and maintenance staff
 - Collect feedback to improve maintenance service quality
-- Develop a reliable full-stack web application using modern web technologies
+- Develop a reliable full-stack web application
 
 ## Proposed Technology Stack
 
@@ -75,26 +76,27 @@ The initial version of CampusFix will focus on the core maintenance workflow:
 - Complete a maintenance request
 - Provide a rating and feedback
 
-Additional features such as image uploads, notifications and data visualisations may be considered in later development stages if time permits.
+Additional features such as image uploads, notifications and data visualisations may be considered in later sprints if time permits.
 
 ## Team Members and Responsibilities
 
 | Team Member | Primary Role | Responsibilities |
 |---|---|---|
-| Kairos Liu Testing | Team Leader & Documentation | Coordinate the project, manage JIRA, communicate with the tutor and maintain project documentation | test |
-| Tian Liao Front-end | Front-end Developer | Develop the user interface and implement request submission and tracking pages |
-| Sen Wang, Weiyi Wang Back-End | Back-end Developer | Develop Spring Boot APIs, business logic and maintenance request workflow |
-| GuiyanWu database| Database & Integration Developer | Design the database, manage data persistence and support system integration and testing |
+| Kairos Liu | Team Leader & Documentation | Coordinate the project, manage JIRA, communicate with the tutor, maintain documentation, and support testing |
+| Tian Liao | Front-end Developer | Develop the user interface and implement maintenance request submission and tracking pages |
+| Sen Wang / Weiyi Wang | Back-end Developer | Develop Spring Boot APIs, business logic and the maintenance request workflow |
+| Guiyan Wu | Database & Integration Developer | Design the database, manage data persistence, and support system integration and testing |
 
 All team members will contribute to project planning, development, testing and documentation.
 
-## Current Sprint 0 Status
+## Sprint 0 Activities
 
-The team is currently completing Sprint 0 activities, including:
+During Sprint 0, the team will:
 
-- Confirming the project topic and scope
-- Setting up the GitHub repository
-- Preparing the README
-- Creating the JIRA project
-- Identifying initial requirements and use cases
-- Assigning Sprint 0 tasks
+- Confirm the project topic and scope
+- Set up the GitHub organisation and repository
+- Prepare the README document
+- Create and configure the JIRA project
+- Identify initial project requirements
+- Identify initial use cases
+- Assign Sprint 0 tasks to team members
