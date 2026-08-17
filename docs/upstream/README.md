@@ -58,7 +58,7 @@ The main goals of CampusFix are to:
 |---|---|
 | Front-end | React |
 | Back-end | Spring Boot |
-| Database | MySQL or PostgreSQL |
+| Database | MySQL |
 | API | REST API |
 | Version Control | Git and GitHub |
 | Project Management | JIRA |
@@ -85,7 +85,7 @@ Additional features such as image uploads, notifications and data visualisations
 | Kairos Liu | Team Leader & Documentation | Coordinate the project, manage JIRA, communicate with the tutor, maintain documentation, and support testing |
 | Tian Liao | Front-end Developer | Develop the user interface and implement maintenance request submission and tracking pages |
 | Sen Wang / Weiyi Wang | Back-end Developer | Develop Spring Boot APIs, business logic and the maintenance request workflow |
-| Guiyan Wu | Database & Integration Developer | Design the database, manage data persistence, and support system integration and testing |
+| Hekang Pan | Database & Integration Developer | Design the database, manage data persistence, and support system integration and testing |
 
 All team members will contribute to project planning, development, testing and documentation.
 
