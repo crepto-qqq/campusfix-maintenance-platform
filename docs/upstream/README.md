@@ -56,9 +56,9 @@ The main goals of CampusFix are to:
 
 | Component | Technology |
 |---|---|
-| Front-end | React |
+| Front-end | HTML, CSS and JavaScript |
 | Back-end | Spring Boot |
-| Database | MySQL |
+| Database | H2 (local development) |
 | API | REST API |
 | Version Control | Git and GitHub |
 | Project Management | JIRA |
@@ -77,6 +77,23 @@ The initial version of CampusFix will focus on the core maintenance workflow:
 - Provide a rating and feedback
 
 Additional features such as image uploads, notifications and data visualisations may be considered in later sprints if time permits.
+
+## Local Development
+
+Requirement: Java 21.
+
+### Start the back-end
+
+```bash
+cd backend
+./gradlew bootRun
+```
+
+On Windows, use `.\gradlew.bat bootRun` for the back-end command.
+
+### Open the front-end
+
+Open `frontend/index.html` directly in a browser, or use the VS Code Live Server extension.
 
 ## Team Members and Responsibilities
 
