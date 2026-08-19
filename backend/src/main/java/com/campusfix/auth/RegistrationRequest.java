@@ -1,0 +1,20 @@
+package com.campusfix.auth;
+
+import jakarta.validation.constraints.Email;
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.Size;
+
+public record RegistrationRequest(//use record to automatically have the request.name and so on function
+        @NotBlank(message = "Name is required")//cant be empty""
+        @Size(max = 100, message = "Name must not exceed 100 characters")
+        String name,
+
+        @NotBlank(message = "Email is required")
+        @Email(message = "Email format is invalid")
+        @Size(max = 255, message = "Email must not exceed 255 characters")
+        String email,
+
+        @NotBlank(message = "Password is required")
+        @Size(min = 8, max = 72, message = "Password must contain between 8 and 72 characters")
+        String password) {
+}
