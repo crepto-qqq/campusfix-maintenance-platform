@@ -2,6 +2,7 @@ package com.campusfix.auth;
 
 import com.campusfix.user.User;
 import com.campusfix.user.UserService;
+import jakarta.servlet.http.HttpSession;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.CrossOrigin;
@@ -32,6 +33,18 @@ public class AuthController {
         return new RegistrationResponse(user.getId(), user.getName(), user.getEmail());
     }
 
+    @PostMapping("/login")
+    public LoginResponse login(
+            @Valid @RequestBody LoginRequest request,
+            HttpSession session) {
+        User user = userService.login(request.email(), request.password());
+        session.setAttribute("userId", user.getId());
+        return new LoginResponse(user.getId(), user.getName(), user.getEmail());
+    }
+
     public record RegistrationResponse(Long id, String name, String email) {
+    }
+
+    public record LoginResponse(Long id, String name, String email) {
     }
 }
