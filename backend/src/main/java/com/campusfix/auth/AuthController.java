@@ -42,6 +42,12 @@ public class AuthController {
         return new LoginResponse(user.getId(), user.getName(), user.getEmail());
     }
 
+    @PostMapping("/logout")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void logout(HttpSession session) {
+        session.invalidate();
+    }
+
     public record RegistrationResponse(Long id, String name, String email) {
     }
 
