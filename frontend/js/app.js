@@ -2,6 +2,9 @@ const API_BASE_URL = 'http://localhost:8080/api';
 
 const registrationForm = document.getElementById('registration-form');
 const registrationMessage = document.getElementById('registration-message');
+const loginForm = document.getElementById('login-form');
+const logoutButton = document.getElementById('logout-button');
+const authMessage = document.getElementById('auth-message');
 
 registrationForm.addEventListener('submit', async (event) => {
   event.preventDefault();
@@ -36,5 +39,42 @@ registrationForm.addEventListener('submit', async (event) => {
     registrationForm.reset();
   } catch (error) {
     registrationMessage.textContent = error.message;
+  }
+});
+
+loginForm.addEventListener('submit', async (event) => {
+  event.preventDefault();
+
+  const loginData = {
+    email: document.getElementById('login-email').value,
+    password: document.getElementById('login-password').value
+  };
+
+  authMessage.textContent = 'Logging in...';
+
+  try {
+    const response = await fetch(`${API_BASE_URL}/auth/login`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      credentials: 'include',
+      body: JSON.stringify(loginData)
+    });
+
+    if (!response.ok) {
+      if (response.status === 401) {
+        throw new Error('Invalid email or password.');
+      }
+
+      throw new Error(`Login failed (${response.status}).`);
+    }
+
+    const user = await response.json();
+    authMessage.textContent = `Logged in as ${user.name}.`;
+    logoutButton.hidden = false;
+    loginForm.reset();
+  } catch (error) {
+    authMessage.textContent = error.message;
   }
 });
