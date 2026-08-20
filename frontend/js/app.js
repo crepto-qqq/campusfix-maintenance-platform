@@ -7,6 +7,8 @@ const logoutButton = document.getElementById('logout-button');
 const authMessage = document.getElementById('auth-message');
 const workspacePage = document.getElementById('workspace-page');
 const profileForm = document.getElementById('profile-form');
+const avatarForm = document.getElementById('avatar-form');
+const profileAvatar = document.getElementById('profile-avatar');
 
 if (registrationForm) {
   registrationForm.addEventListener('submit', async (event) => {
@@ -102,6 +104,9 @@ async function checkWorkspaceLogin() {
 
 if (profileForm) {
   loadProfile();
+  loadAvatar().catch((error) => {
+    authMessage.textContent = error.message;
+  });
 
   profileForm.addEventListener('submit', async (event) => {
     event.preventDefault();
@@ -142,6 +147,50 @@ if (profileForm) {
   });
 }
 
+if (avatarForm) {
+  avatarForm.addEventListener('submit', async (event) => {
+    event.preventDefault();
+
+    const avatarFile = document.getElementById('avatar-file').files[0];
+    if (!avatarFile) {
+      authMessage.textContent = 'Please select an image.';
+      return;
+    }
+
+    if (avatarFile.size > 15 * 1024 * 1024) {
+      authMessage.textContent = 'Image must not exceed 15 MB.';
+      return;
+    }
+
+    const avatarData = new FormData();
+    avatarData.append('avatar', avatarFile);
+    authMessage.textContent = 'Uploading picture...';
+
+    try {
+      const response = await fetch(`${API_BASE_URL}/users/me/avatar`, {
+        method: 'POST',
+        credentials: 'include',
+        body: avatarData
+      });
+
+      if (response.status === 401) {
+        window.location.href = './index.html';
+        return;
+      }
+
+      if (!response.ok) {
+        throw new Error(`Picture upload failed (${response.status}).`);
+      }
+
+      await loadAvatar();
+      avatarForm.reset();
+      authMessage.textContent = 'Profile picture uploaded.';
+    } catch (error) {
+      authMessage.textContent = error.message;
+    }
+  });
+}
+
 async function loadProfile() {
   authMessage.textContent = 'Loading profile...';
 
@@ -173,6 +222,37 @@ function displayProfile(user) {
   document.getElementById('profile-name').value = user.name;
   document.getElementById('contact-information').value = user.contactInformation ?? '';
   document.getElementById('profile-details').value = user.profileDetails ?? '';
+}
+
+async function loadAvatar() {
+  const response = await fetch(`${API_BASE_URL}/users/me/avatar?v=${Date.now()}`, {
+    credentials: 'include'
+  });
+
+  if (response.status === 401) {
+    window.location.href = './index.html';
+    return;
+  }
+
+  if (response.status === 404) {
+    profileAvatar.hidden = true;
+    return;
+  }
+
+  if (!response.ok) {
+    throw new Error(`Picture loading failed (${response.status}).`);
+  }
+
+  const avatarBlob = await response.blob();
+  const previousAvatarUrl = profileAvatar.dataset.objectUrl;
+  if (previousAvatarUrl) {
+    URL.revokeObjectURL(previousAvatarUrl);
+  }
+
+  const avatarUrl = URL.createObjectURL(avatarBlob);
+  profileAvatar.dataset.objectUrl = avatarUrl;
+  profileAvatar.src = avatarUrl;
+  profileAvatar.hidden = false;
 }
 
 if (logoutButton) {
