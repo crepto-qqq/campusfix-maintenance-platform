@@ -9,9 +9,18 @@
   <body>
     <main class="container">
       <h1>CampusFix</h1>
+      <a class="secondary-button" href="./workspace.html">Back to workspace</a>
 
       <section>
         <h2>User Profile</h2>
+
+        <img id="profile-avatar" class="profile-avatar" alt="Profile picture" hidden>
+
+        <form id="avatar-form">
+          <label for="avatar-file">Profile picture</label>
+          <input id="avatar-file" name="avatar" type="file" accept="image/*" required>
+          <button type="submit">Upload Picture</button>
+        </form>
 
         <p><strong>User ID:</strong> <span id="profile-id"></span></p>
         <p><strong>Email:</strong> <span id="profile-email"></span></p>

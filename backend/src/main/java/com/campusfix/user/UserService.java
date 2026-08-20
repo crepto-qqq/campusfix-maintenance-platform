@@ -64,6 +64,13 @@ public class UserService {
         return userRepository.save(user);
     }
 
+    @Transactional
+    public void updateAvatar(Long userId, byte[] avatarData, String avatarContentType) {
+        User user = findUserById(userId);
+        user.setAvatar(avatarData, avatarContentType);
+        userRepository.save(user);
+    }
+
     private User findUserById(Long userId) {
         return userRepository.findById(userId)
                 .orElseThrow(() -> new ResponseStatusException(

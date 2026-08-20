@@ -5,6 +5,7 @@ import jakarta.persistence.Entity;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
+import jakarta.persistence.Lob;
 import jakarta.persistence.Table;
 
 @Entity
@@ -29,6 +30,13 @@ public class User {
 
     @Column(name = "profile_details", length = 1000)
     private String profileDetails;
+
+    @Lob
+    @Column(name = "avatar_data")
+    private byte[] avatarData;
+
+    @Column(name = "avatar_content_type", length = 100)
+    private String avatarContentType;
 
     protected User() {
     }
@@ -73,5 +81,18 @@ public class User {
 
     public void setProfileDetails(String profileDetails) {
         this.profileDetails = profileDetails;
+    }
+
+    public byte[] getAvatarData() {
+        return avatarData;
+    }
+
+    public String getAvatarContentType() {
+        return avatarContentType;
+    }
+
+    public void setAvatar(byte[] avatarData, String avatarContentType) {
+        this.avatarData = avatarData;
+        this.avatarContentType = avatarContentType;
     }
 }
