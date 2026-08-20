@@ -27,6 +27,23 @@
           <p id="registration-message" role="status"></p>
         </form>
       </section>
+
+      <section>
+        <h2>Login</h2>
+
+        <form id="login-form">
+          <label for="login-email">Email</label>
+          <input id="login-email" name="email" type="email" maxlength="255" required>
+
+          <label for="login-password">Password</label>
+          <input id="login-password" name="password" type="password" minlength="8" maxlength="72" required>
+
+          <button type="submit">Login</button>
+        </form>
+
+        <button id="logout-button" type="button" hidden>Logout</button>
+        <p id="auth-message" role="status"></p>
+      </section>
     </main>
 
     <script src="./js/app.js"></script>
