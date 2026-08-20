@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Profile | CampusFix</title>
+    <link rel="stylesheet" href="./css/styles.css">
+  </head>
+  <body>
+    <main class="container">
+      <h1>CampusFix</h1>
+
+      <section>
+        <h2>User Profile</h2>
+
+        <p><strong>User ID:</strong> <span id="profile-id"></span></p>
+        <p><strong>Email:</strong> <span id="profile-email"></span></p>
+
+        <form id="profile-form">
+          <label for="profile-name">Name</label>
+          <input id="profile-name" name="name" type="text" maxlength="100" required>
+
+          <label for="contact-information">Contact information</label>
+          <input id="contact-information" name="contactInformation" type="text" maxlength="255">
+
+          <label for="profile-details">Profile details</label>
+          <textarea id="profile-details" name="profileDetails" rows="5" maxlength="1000"></textarea>
+
+          <button type="submit">Update Profile</button>
+        </form>
+
+        <button id="logout-button" type="button">Logout</button>
+        <p id="auth-message" role="status"></p>
+      </section>
+    </main>
+
+    <script src="./js/app.js"></script>
+  </body>
+</html>

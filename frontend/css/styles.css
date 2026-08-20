@@ -27,7 +27,8 @@ label {
   font-weight: bold;
 }
 
-input {
+input,
+textarea {
   width: 100%;
   padding: 10px;
   border: 1px solid #bbb;
@@ -48,4 +49,23 @@ button {
 #registration-message {
   min-height: 24px;
   margin: 0;
+}
+
+#logout-button {
+  margin-top: 16px;
+}
+
+.workspace {
+  min-height: 100vh;
+}
+
+.workspace-profile-button {
+  position: fixed;
+  right: 24px;
+  bottom: 24px;
+  padding: 12px 20px;
+  border-radius: 4px;
+  color: #fff;
+  background: #1769aa;
+  text-decoration: none;
 }
