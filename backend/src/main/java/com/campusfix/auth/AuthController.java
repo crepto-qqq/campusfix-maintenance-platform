@@ -4,6 +4,7 @@ import com.campusfix.user.User;
 import com.campusfix.user.UserService;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
+import org.springframework.web.bind.annotation.CrossOrigin;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -12,6 +13,10 @@ import org.springframework.web.bind.annotation.RestController;
 
 @RestController
 @RequestMapping("/api/auth")
+@CrossOrigin(
+        origins = {"http://localhost:5500", "http://127.0.0.1:5500"},
+        allowCredentials = "true"
+)
 public class AuthController {
 
     private final UserService userService;
