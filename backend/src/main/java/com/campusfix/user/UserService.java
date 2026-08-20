@@ -27,4 +27,22 @@ public class UserService {
         User user = new User(name.trim(), normalizedEmail, password);
         return userRepository.save(user);
     }
+
+    @Transactional(readOnly = true)
+    public User login(String email, String password) {
+        String normalizedEmail = email.trim().toLowerCase(Locale.ROOT);
+
+        User user = userRepository.findByEmailIgnoreCase(normalizedEmail)
+                .orElseThrow(() -> new ResponseStatusException(
+                        HttpStatus.UNAUTHORIZED,
+                        "Invalid email or password"));
+
+        if (!user.getPassword().equals(password)) {
+            throw new ResponseStatusException(
+                    HttpStatus.UNAUTHORIZED,
+                    "Invalid email or password");
+        }
+
+        return user;
+    }
 }
