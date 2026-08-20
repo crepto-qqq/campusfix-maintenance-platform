@@ -45,4 +45,37 @@ public class UserService {
 
         return user;
     }
+
+    @Transactional(readOnly = true)
+    public User getProfile(Long userId) {
+        return findUserById(userId);
+    }
+
+    @Transactional
+    public User updateProfile(
+            Long userId,
+            String name,
+            String contactInformation,
+            String profileDetails) {
+        User user = findUserById(userId);
+        user.setName(name.trim());
+        user.setContactInformation(trimOrNull(contactInformation));
+        user.setProfileDetails(trimOrNull(profileDetails));
+        return userRepository.save(user);
+    }
+
+    private User findUserById(Long userId) {
+        return userRepository.findById(userId)
+                .orElseThrow(() -> new ResponseStatusException(
+                        HttpStatus.NOT_FOUND,
+                        "User not found"));
+    }
+
+    private String trimOrNull(String value) {
+        if (value == null || value.isBlank()) {
+            return null;
+        }
+
+        return value.trim();
+    }
 }
