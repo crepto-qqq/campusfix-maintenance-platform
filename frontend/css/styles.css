@@ -90,3 +90,26 @@ button {
 #avatar-form {
   margin-bottom: 24px;
 }
+
+.profile-page .container {
+  position: relative;
+  overflow: hidden;
+}
+
+.profile-page .container::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  background-image: url("../images/profile-background.gif");
+  background-position: center;
+  background-repeat: no-repeat;
+  background-size: cover;
+  opacity: 0.2;
+  pointer-events: none;
+}
+
+.profile-page .container > * {
+  position: relative;
+  z-index: 1;
+}
