@@ -3,30 +3,12 @@
   <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>CampusFix</title>
+    <title>Login | CampusFix</title>
     <link rel="stylesheet" href="./css/styles.css">
   </head>
   <body>
     <main class="container">
       <h1>CampusFix</h1>
-
-      <section>
-        <h2>Create an account</h2>
-
-        <form id="registration-form">
-          <label for="name">Name</label>
-          <input id="name" name="name" type="text" maxlength="100" required>
-
-          <label for="email">Email</label>
-          <input id="email" name="email" type="email" maxlength="255" required>
-
-          <label for="password">Password</label>
-          <input id="password" name="password" type="password" minlength="8" maxlength="72" required>
-
-          <button type="submit">Register</button>
-          <p id="registration-message" role="status"></p>
-        </form>
-      </section>
 
       <section>
         <h2>Login</h2>
@@ -41,6 +23,7 @@
           <button type="submit">Login</button>
         </form>
 
+        <p>Don't have an account? <a href="./register.html">Create an account</a></p>
         <button id="logout-button" type="button" hidden>Logout</button>
         <p id="auth-message" role="status"></p>
       </section>
