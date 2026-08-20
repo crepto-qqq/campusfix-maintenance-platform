@@ -82,3 +82,25 @@ if (loginForm) {
     }
   });
 }
+
+if (logoutButton) {
+  logoutButton.addEventListener('click', async () => {
+    authMessage.textContent = 'Logging out...';
+
+    try {
+      const response = await fetch(`${API_BASE_URL}/auth/logout`, {
+        method: 'POST',
+        credentials: 'include'
+      });
+
+      if (!response.ok) {
+        throw new Error(`Logout failed (${response.status}).`);
+      }
+
+      authMessage.textContent = 'Logged out.';
+      logoutButton.hidden = true;
+    } catch (error) {
+      authMessage.textContent = error.message;
+    }
+  });
+}
