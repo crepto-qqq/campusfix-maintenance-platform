@@ -28,7 +28,8 @@ label {
 }
 
 input,
-textarea {
+textarea,
+select {
   width: 100%;
   padding: 10px;
   border: 1px solid #bbb;
@@ -55,19 +56,71 @@ button {
   margin-top: 16px;
 }
 
-.workspace {
-  min-height: 100vh;
+.workspace-container {
+  width: min(90%, 960px);
+  margin: 40px auto;
+}
+
+.workspace-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 24px;
+}
+
+.workspace-header h1 {
+  margin: 0;
+}
+
+.workspace-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 16px;
 }
 
 .workspace-profile-button {
-  position: fixed;
-  right: 24px;
-  bottom: 24px;
-  padding: 12px 20px;
+  display: inline-block;
+  padding: 10px 20px;
   border-radius: 4px;
   color: #fff;
   background: #1769aa;
   text-decoration: none;
+}
+
+.role-badge {
+  display: inline-block;
+  padding: 6px 12px;
+  border-radius: 999px;
+  color: #fff;
+  background: #444;
+  font-size: 0.9rem;
+}
+
+.role-general_user {
+  background: #1769aa;
+}
+
+.role-maintenance_staff {
+  background: #6f42c1;
+}
+
+.role-administrator {
+  background: #b02a37;
+}
+
+.card {
+  margin-bottom: 24px;
+  padding: 24px;
+  background: #fff;
+  border-radius: 8px;
+}
+
+.card h2 {
+  margin-top: 0;
+}
+
+#ticket-form {
+  max-width: none;
 }
 
 .secondary-button {
@@ -76,7 +129,154 @@ button {
   border-radius: 4px;
   color: #fff;
   background: #666;
-  text-decoration: none;
+  cursor: pointer;
+  border: 0;
+  font: inherit;
+}
+
+.secondary-danger {
+  background: #b02a37;
+}
+
+#ticket-form-actions {
+  display: flex;
+  gap: 12px;
+}
+
+#ticket-message {
+  min-height: 24px;
+  margin: 0;
+}
+
+.tickets-list {
+  display: grid;
+  gap: 16px;
+}
+
+.ticket-card {
+  padding: 16px;
+  border: 1px solid #ddd;
+  border-radius: 8px;
+}
+
+.ticket-card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.ticket-card-header h3 {
+  margin: 0;
+}
+
+.status-badge {
+  flex-shrink: 0;
+  padding: 4px 10px;
+  border-radius: 999px;
+  color: #fff;
+  font-size: 0.8rem;
+}
+
+.status-pending {
+  background: #f0ad4e;
+}
+
+.status-assigned {
+  background: #5bc0de;
+}
+
+.status-in_progress {
+  background: #1769aa;
+}
+
+.status-completed {
+  background: #28a745;
+}
+
+.status-cancelled {
+  background: #999;
+}
+
+.ticket-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 8px 0;
+  color: #555;
+  font-size: 0.9rem;
+}
+
+.urgency-low {
+  color: #28a745;
+  font-weight: bold;
+}
+
+.urgency-medium {
+  color: #f0ad4e;
+  font-weight: bold;
+}
+
+.urgency-high {
+  color: #d9534f;
+  font-weight: bold;
+}
+
+.urgency-emergency {
+  color: #b02a37;
+  font-weight: bold;
+}
+
+.ticket-description {
+  white-space: pre-wrap;
+  margin: 8px 0;
+}
+
+.ticket-dates {
+  color: #777;
+  font-size: 0.85rem;
+  margin: 8px 0;
+}
+
+.ticket-images {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 8px 0;
+}
+
+.ticket-image-wrapper img {
+  width: 120px;
+  height: 120px;
+  object-fit: cover;
+  border-radius: 4px;
+  border: 1px solid #ddd;
+}
+
+.ticket-card-actions {
+  display: flex;
+  gap: 12px;
+  margin-top: 12px;
+}
+
+.ticket-edit-button {
+  padding: 8px 16px;
+  border: 0;
+  border-radius: 4px;
+  color: #fff;
+  background: #1769aa;
+  cursor: pointer;
+  font: inherit;
+}
+
+.ticket-cancel-button {
+  padding: 8px 16px;
+  border: 0;
+  border-radius: 4px;
+  color: #fff;
+  background: #b02a37;
+  cursor: pointer;
+  font: inherit;
 }
 
 .profile-avatar {

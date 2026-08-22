@@ -7,9 +7,68 @@
     <link rel="stylesheet" href="./css/styles.css">
   </head>
   <body>
-    <main id="workspace-page" class="workspace"></main>
+    <main class="workspace-container">
+      <header class="workspace-header">
+        <h1>CampusFix</h1>
+        <div class="workspace-header-actions">
+          <span id="workspace-role" class="role-badge" hidden></span>
+          <a class="workspace-profile-button" href="./profile.html">Profile</a>
+        </div>
+      </header>
 
-    <a class="workspace-profile-button" href="./profile.html">Profile</a>
+      <section id="request-form-section" class="card">
+        <h2 id="request-form-title">Submit Maintenance Request</h2>
+
+        <form id="ticket-form">
+          <label for="ticket-title">Issue Title</label>
+          <input id="ticket-title" name="title" type="text" maxlength="150" required>
+
+          <label for="ticket-description">Description</label>
+          <textarea id="ticket-description" name="description" rows="5" maxlength="4000" required></textarea>
+
+          <label for="ticket-category">Maintenance Category</label>
+          <select id="ticket-category" name="category" required>
+            <option value="ELECTRICAL">Electrical</option>
+            <option value="PLUMBING">Plumbing</option>
+            <option value="HVAC">Heating / Air Conditioning</option>
+            <option value="CARPENTRY">Carpentry</option>
+            <option value="CLEANING">Cleaning</option>
+            <option value="IT">IT</option>
+            <option value="GROUNDS">Grounds</option>
+            <option value="OTHER">Other</option>
+          </select>
+
+          <label for="ticket-location">Location</label>
+          <input id="ticket-location" name="location" type="text" maxlength="255" required>
+
+          <label for="ticket-urgency">Urgency Level</label>
+          <select id="ticket-urgency" name="urgency" required>
+            <option value="LOW">Low</option>
+            <option value="MEDIUM">Medium</option>
+            <option value="HIGH">High</option>
+            <option value="EMERGENCY">Emergency</option>
+          </select>
+
+          <label for="ticket-images">Issue Images (optional, up to 5)</label>
+          <input id="ticket-images" name="images" type="file" accept="image/*" multiple>
+
+          <div id="ticket-form-actions">
+            <button type="submit" id="ticket-submit-button">Submit Request</button>
+            <button type="button" id="ticket-reset-button" class="secondary-button" hidden>Cancel Edit</button>
+          </div>
+
+          <input id="ticket-id" type="hidden">
+          <p id="ticket-message" role="status"></p>
+        </form>
+      </section>
+
+      <section class="card">
+        <h2>My Maintenance Requests</h2>
+        <div id="tickets-list" class="tickets-list">
+          <p id="tickets-message" role="status">Loading requests...</p>
+        </div>
+      </section>
+    </main>
 
     <script src="./js/app.js"></script>
   </body>
