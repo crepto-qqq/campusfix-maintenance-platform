@@ -71,6 +71,13 @@ public class UserService {
         userRepository.save(user);
     }
 
+    @Transactional
+    public User updateRole(Long userId, Role role) {
+        User user = findUserById(userId);
+        user.setRole(role);
+        return userRepository.save(user);
+    }
+
     private User findUserById(Long userId) {
         return userRepository.findById(userId)
                 .orElseThrow(() -> new ResponseStatusException(

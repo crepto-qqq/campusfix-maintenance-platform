@@ -1,4 +1,8 @@
-const API_BASE_URL = 'http://localhost:8080/api';
+// Use the same hostname as the page so the session cookie (JSESSIONID) is
+// always sent to the backend. This avoids the "login bounces back" issue that
+// happens when the frontend is opened on 127.0.0.1 while the backend is on
+// localhost (or vice versa): the two hostnames do not share cookies.
+const API_BASE_URL = `http://${window.location.hostname}:8080/api`;
 
 const registrationForm = document.getElementById('registration-form');
 const registrationMessage = document.getElementById('registration-message');
@@ -6,6 +10,15 @@ const loginForm = document.getElementById('login-form');
 const logoutButton = document.getElementById('logout-button');
 const authMessage = document.getElementById('auth-message');
 const workspacePage = document.getElementById('workspace-page');
+const workspaceRole = document.getElementById('workspace-role');
+const ticketForm = document.getElementById('ticket-form');
+const ticketSubmitButton = document.getElementById('ticket-submit-button');
+const ticketResetButton = document.getElementById('ticket-reset-button');
+const ticketFormTitle = document.getElementById('request-form-title');
+const ticketIdInput = document.getElementById('ticket-id');
+const ticketMessage = document.getElementById('ticket-message');
+const ticketsList = document.getElementById('tickets-list');
+const ticketsMessage = document.getElementById('tickets-message');
 const profileForm = document.getElementById('profile-form');
 const avatarForm = document.getElementById('avatar-form');
 const profileAvatar = document.getElementById('profile-avatar');
@@ -84,22 +97,392 @@ if (loginForm) {
   });
 }
 
-if (workspacePage) {
-  checkWorkspaceLogin();
+if (ticketForm) {
+  initWorkspace();
+  ticketForm.addEventListener('submit', handleTicketSubmit);
+  ticketResetButton.addEventListener('click', resetTicketForm);
 }
 
-async function checkWorkspaceLogin() {
+async function initWorkspace() {
+  const user = await loadCurrentUser();
+  if (!user) {
+    window.location.href = './index.html';
+    return;
+  }
+
+  displayWorkspaceRole(user);
+  loadTickets();
+}
+
+async function loadCurrentUser() {
   try {
     const response = await fetch(`${API_BASE_URL}/users/me`, {
       credentials: 'include'
     });
 
-    if (!response.ok) {
-      window.location.href = './index.html';
+    if (response.status === 401) {
+      return null;
     }
+
+    if (!response.ok) {
+      return null;
+    }
+
+    return await response.json();
   } catch (error) {
-    window.location.href = './index.html';
+    return null;
   }
+}
+
+function displayWorkspaceRole(user) {
+  if (!workspaceRole || !user.role) {
+    return;
+  }
+
+  const labels = {
+    GENERAL_USER: 'General User',
+    MAINTENANCE_STAFF: 'Maintenance Staff',
+    ADMINISTRATOR: 'Administrator'
+  };
+
+  workspaceRole.textContent = labels[user.role] ?? user.role;
+  workspaceRole.classList.add(`role-${user.role.toLowerCase()}`);
+  workspaceRole.hidden = false;
+}
+
+async function loadTickets() {
+  ticketsMessage.textContent = 'Loading requests...';
+
+  try {
+    const response = await fetch(`${API_BASE_URL}/tickets`, {
+      credentials: 'include'
+    });
+
+    if (response.status === 401) {
+      window.location.href = './index.html';
+      return;
+    }
+
+    if (!response.ok) {
+      throw new Error(`Loading requests failed (${response.status}).`);
+    }
+
+    const tickets = await response.json();
+    renderTickets(tickets);
+  } catch (error) {
+    ticketsMessage.textContent = error.message;
+  }
+}
+
+function renderTickets(tickets) {
+  if (!tickets || tickets.length === 0) {
+    ticketsMessage.textContent = 'You have no maintenance requests yet.';
+    ticketsList.innerHTML = '';
+    return;
+  }
+
+  ticketsMessage.textContent = '';
+  ticketsList.innerHTML = '';
+
+  tickets.forEach((ticket) => {
+    ticketsList.appendChild(renderTicket(ticket));
+  });
+}
+
+function renderTicket(ticket) {
+  const article = document.createElement('article');
+  article.className = 'ticket-card';
+  article.dataset.ticketId = ticket.id;
+
+  const canEdit = ticket.status === 'PENDING';
+  const canCancel = ticket.status === 'PENDING';
+
+  article.innerHTML = `
+    <div class="ticket-card-header">
+      <h3>${escapeHtml(ticket.title)}</h3>
+      <span class="status-badge status-${ticket.status.toLowerCase()}">${formatStatus(ticket.status)}</span>
+    </div>
+    <p class="ticket-meta">
+      <span>${formatCategory(ticket.category)}</span>
+      &middot;
+      <span>${escapeHtml(ticket.location)}</span>
+      &middot;
+      <span class="urgency-${ticket.urgency.toLowerCase()}">${formatUrgency(ticket.urgency)}</span>
+    </p>
+    <p class="ticket-description">${escapeHtml(ticket.description)}</p>
+    <p class="ticket-dates">Submitted: ${formatDate(ticket.createdAt)}</p>
+    <div class="ticket-images" data-ticket-id="${ticket.id}"></div>
+    <div class="ticket-card-actions">
+      ${canEdit ? `<button type="button" class="ticket-edit-button" data-ticket-id="${ticket.id}">Edit</button>` : ''}
+      ${canCancel ? `<button type="button" class="ticket-cancel-button secondary-danger" data-ticket-id="${ticket.id}">Cancel Request</button>` : ''}
+    </div>
+  `;
+
+  article.querySelectorAll('.ticket-edit-button').forEach((button) => {
+    button.addEventListener('click', () => startEditing(ticket));
+  });
+
+  article.querySelectorAll('.ticket-cancel-button').forEach((button) => {
+    button.addEventListener('click', () => confirmCancelTicket(ticket.id));
+  });
+
+  loadTicketImages(ticket.id, ticket.imageIds, article.querySelector('.ticket-images'));
+
+  return article;
+}
+
+async function loadTicketImages(ticketId, imageIds, container) {
+  if (!imageIds || imageIds.length === 0) {
+    container.innerHTML = '';
+    return;
+  }
+
+  const images = await Promise.all(
+    imageIds.map(async (imageId) => {
+      try {
+        const response = await fetch(
+          `${API_BASE_URL}/tickets/${ticketId}/images/${imageId}`,
+          { credentials: 'include' }
+        );
+
+        if (!response.ok) {
+          return null;
+        }
+
+        const blob = await response.blob();
+        return { imageId, url: URL.createObjectURL(blob) };
+      } catch (error) {
+        return null;
+      }
+    })
+  );
+
+  container.innerHTML = '';
+  images.forEach((image) => {
+    if (!image) {
+      return;
+    }
+
+    const wrapper = document.createElement('div');
+    wrapper.className = 'ticket-image-wrapper';
+    wrapper.innerHTML = `<img src="${image.url}" alt="Issue image">`;
+    container.appendChild(wrapper);
+  });
+}
+
+function startEditing(ticket) {
+  document.getElementById('ticket-title').value = ticket.title;
+  document.getElementById('ticket-description').value = ticket.description;
+  document.getElementById('ticket-category').value = ticket.category;
+  document.getElementById('ticket-location').value = ticket.location;
+  document.getElementById('ticket-urgency').value = ticket.urgency;
+  ticketIdInput.value = ticket.id;
+
+  ticketFormTitle.textContent = 'Edit Maintenance Request';
+  ticketSubmitButton.textContent = 'Save Changes';
+  ticketResetButton.hidden = false;
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+function resetTicketForm() {
+  ticketForm.reset();
+  ticketIdInput.value = '';
+  ticketFormTitle.textContent = 'Submit Maintenance Request';
+  ticketSubmitButton.textContent = 'Submit Request';
+  ticketResetButton.hidden = true;
+  ticketMessage.textContent = '';
+}
+
+async function handleTicketSubmit(event) {
+  event.preventDefault();
+
+  const ticketData = {
+    title: document.getElementById('ticket-title').value.trim(),
+    description: document.getElementById('ticket-description').value.trim(),
+    category: document.getElementById('ticket-category').value,
+    location: document.getElementById('ticket-location').value.trim(),
+    urgency: document.getElementById('ticket-urgency').value
+  };
+
+  const images = document.getElementById('ticket-images').files;
+  const editingId = ticketIdInput.value;
+
+  try {
+    let ticketId = editingId;
+
+    if (editingId) {
+      ticketMessage.textContent = 'Saving changes...';
+      const response = await fetch(`${API_BASE_URL}/tickets/${editingId}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify(ticketData)
+      });
+
+      if (response.status === 401) {
+        window.location.href = './index.html';
+        return;
+      }
+
+      if (!response.ok) {
+        const data = await response.json().catch(() => null);
+        throw new Error(data?.message ?? `Update failed (${response.status}).`);
+      }
+
+      ticketMessage.textContent = 'Request updated.';
+    } else {
+      ticketMessage.textContent = 'Submitting request...';
+      const response = await fetch(`${API_BASE_URL}/tickets`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify(ticketData)
+      });
+
+      if (response.status === 401) {
+        window.location.href = './index.html';
+        return;
+      }
+
+      if (!response.ok) {
+        const data = await response.json().catch(() => null);
+        throw new Error(data?.message ?? `Submission failed (${response.status}).`);
+      }
+
+      const created = await response.json();
+      ticketId = created.id;
+      ticketMessage.textContent = 'Request submitted.';
+    }
+
+    if (images.length > 0) {
+      await uploadTicketImages(ticketId, images);
+    }
+
+    resetTicketForm();
+    await loadTickets();
+  } catch (error) {
+    ticketMessage.textContent = error.message;
+  }
+}
+
+async function uploadTicketImages(ticketId, files) {
+  const maxSize = 15 * 1024 * 1024;
+
+  for (const file of files) {
+    if (file.size > maxSize) {
+      throw new Error('Each image must not exceed 15 MB.');
+    }
+
+    const formData = new FormData();
+    formData.append('image', file);
+
+    const response = await fetch(`${API_BASE_URL}/tickets/${ticketId}/images`, {
+      method: 'POST',
+      credentials: 'include',
+      body: formData
+    });
+
+    if (response.status === 401) {
+      window.location.href = './index.html';
+      return;
+    }
+
+    if (!response.ok) {
+      const data = await response.json().catch(() => null);
+      throw new Error(data?.message ?? `Image upload failed (${response.status}).`);
+    }
+  }
+}
+
+async function confirmCancelTicket(ticketId) {
+  if (!window.confirm('Are you sure you want to cancel this maintenance request?')) {
+    return;
+  }
+
+  try {
+    const response = await fetch(`${API_BASE_URL}/tickets/${ticketId}/cancel`, {
+      method: 'POST',
+      credentials: 'include'
+    });
+
+    if (response.status === 401) {
+      window.location.href = './index.html';
+      return;
+    }
+
+    if (!response.ok) {
+      const data = await response.json().catch(() => null);
+      throw new Error(data?.message ?? `Cancellation failed (${response.status}).`);
+    }
+
+    await loadTickets();
+  } catch (error) {
+    alert(error.message);
+  }
+}
+
+function formatStatus(status) {
+  const labels = {
+    PENDING: 'Pending',
+    ASSIGNED: 'Assigned',
+    IN_PROGRESS: 'In Progress',
+    COMPLETED: 'Completed',
+    CANCELLED: 'Cancelled'
+  };
+  return labels[status] ?? status;
+}
+
+function formatCategory(category) {
+  const labels = {
+    ELECTRICAL: 'Electrical',
+    PLUMBING: 'Plumbing',
+    HVAC: 'Heating / Air Conditioning',
+    CARPENTRY: 'Carpentry',
+    CLEANING: 'Cleaning',
+    IT: 'IT',
+    GROUNDS: 'Grounds',
+    OTHER: 'Other'
+  };
+  return labels[category] ?? category;
+}
+
+function formatUrgency(urgency) {
+  const labels = {
+    LOW: 'Low',
+    MEDIUM: 'Medium',
+    HIGH: 'High',
+    EMERGENCY: 'Emergency'
+  };
+  return labels[urgency] ?? urgency;
+}
+
+function formatDate(value) {
+  if (!value) {
+    return '';
+  }
+
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) {
+    return value;
+  }
+
+  return date.toLocaleString();
+}
+
+function escapeHtml(value) {
+  if (value === null || value === undefined) {
+    return '';
+  }
+
+  const entities = {
+    '&': '&' + 'amp;',
+    '<': '&' + 'lt;',
+    '>': '&' + 'gt;',
+    '"': '&' + 'quot;',
+    "'": '&' + '#039;'
+  };
+
+  return String(value).replace(/[&<>"']/g, (char) => entities[char]);
 }
 
 if (profileForm) {
@@ -219,9 +602,19 @@ async function loadProfile() {
 function displayProfile(user) {
   document.getElementById('profile-id').textContent = user.id;
   document.getElementById('profile-email').textContent = user.email;
+  document.getElementById('profile-role').textContent = formatRole(user.role);
   document.getElementById('profile-name').value = user.name;
   document.getElementById('contact-information').value = user.contactInformation ?? '';
   document.getElementById('profile-details').value = user.profileDetails ?? '';
+}
+
+function formatRole(role) {
+  const labels = {
+    GENERAL_USER: 'General User',
+    MAINTENANCE_STAFF: 'Maintenance Staff',
+    ADMINISTRATOR: 'Administrator'
+  };
+  return labels[role] ?? role ?? '';
 }
 
 async function loadAvatar() {

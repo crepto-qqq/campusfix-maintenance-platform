@@ -9,6 +9,7 @@ import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.CrossOrigin;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -83,6 +84,17 @@ public class UserController {
                 .body(user.getAvatarData());
     }
 
+    @PutMapping("/{userId}/role")
+    public ProfileResponse updateUserRole(
+            @PathVariable Long userId,
+            @Valid @RequestBody RoleUpdateRequest request,
+            HttpSession session) {
+        requireAdministrator(session);
+
+        User user = userService.updateRole(userId, request.role());
+        return createProfileResponse(user);
+    }
+
     private void validateAvatar(MultipartFile avatar) {
         if (avatar.isEmpty()) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Image is required");
@@ -108,11 +120,21 @@ public class UserController {
         throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Login is required");
     }
 
+    private void requireAdministrator(HttpSession session) {
+        Long userId = getLoggedInUserId(session);
+        User current = userService.getProfile(userId);
+
+        if (current.getRole() != Role.ADMINISTRATOR) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Administrator access required");
+        }
+    }
+
     private ProfileResponse createProfileResponse(User user) {
         return new ProfileResponse(
                 user.getId(),
                 user.getEmail(),
                 user.getName(),
+                user.getRole(),
                 user.getContactInformation(),
                 user.getProfileDetails());
     }
@@ -121,6 +143,7 @@ public class UserController {
             Long id,
             String email,
             String name,
+            Role role,
             String contactInformation,
             String profileDetails) {
     }

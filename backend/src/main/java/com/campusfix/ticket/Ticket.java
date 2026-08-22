@@ -1,0 +1,159 @@
+package com.campusfix.ticket;
+
+import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.List;
+
+import com.campusfix.user.User;
+
+import jakarta.persistence.CascadeType;
+import jakarta.persistence.Column;
+import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
+import jakarta.persistence.FetchType;
+import jakarta.persistence.GeneratedValue;
+import jakarta.persistence.GenerationType;
+import jakarta.persistence.Id;
+import jakarta.persistence.JoinColumn;
+import jakarta.persistence.ManyToOne;
+import jakarta.persistence.OneToMany;
+import jakarta.persistence.Table;
+
+@Entity
+@Table(name = "tickets")
+public class Ticket {
+
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long id;
+
+    @Column(nullable = false, length = 150)
+    private String title;
+
+    @Column(nullable = false, length = 4000)
+    private String description;
+
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false, length = 30)
+    private TicketCategory category;
+
+    @Column(nullable = false, length = 255)
+    private String location;
+
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false, length = 30)
+    private UrgencyLevel urgency;
+
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false, length = 30)
+    private TicketStatus status = TicketStatus.PENDING;
+
+    @ManyToOne(fetch = FetchType.LAZY, optional = false)
+    @JoinColumn(name = "submitted_by", nullable = false)
+    private User submittedBy;
+
+    @Column(name = "created_at", nullable = false, updatable = false)
+    private LocalDateTime createdAt = LocalDateTime.now();
+
+    @Column(name = "updated_at", nullable = false)
+    private LocalDateTime updatedAt = LocalDateTime.now();
+
+    @OneToMany(mappedBy = "ticket", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.EAGER)
+    private List<TicketImage> images = new ArrayList<>();
+
+    protected Ticket() {
+    }
+
+    public Ticket(
+            String title,
+            String description,
+            TicketCategory category,
+            String location,
+            UrgencyLevel urgency,
+            User submittedBy) {
+        this.title = title;
+        this.description = description;
+        this.category = category;
+        this.location = location;
+        this.urgency = urgency;
+        this.submittedBy = submittedBy;
+    }
+
+    public void touch() {
+        this.updatedAt = LocalDateTime.now();
+    }
+
+    public Long getId() {
+        return id;
+    }
+
+    public String getTitle() {
+        return title;
+    }
+
+    public void setTitle(String title) {
+        this.title = title;
+    }
+
+    public String getDescription() {
+        return description;
+    }
+
+    public void setDescription(String description) {
+        this.description = description;
+    }
+
+    public TicketCategory getCategory() {
+        return category;
+    }
+
+    public void setCategory(TicketCategory category) {
+        this.category = category;
+    }
+
+    public String getLocation() {
+        return location;
+    }
+
+    public void setLocation(String location) {
+        this.location = location;
+    }
+
+    public UrgencyLevel getUrgency() {
+        return urgency;
+    }
+
+    public void setUrgency(UrgencyLevel urgency) {
+        this.urgency = urgency;
+    }
+
+    public TicketStatus getStatus() {
+        return status;
+    }
+
+    public void setStatus(TicketStatus status) {
+        this.status = status;
+    }
+
+    public User getSubmittedBy() {
+        return submittedBy;
+    }
+
+    public LocalDateTime getCreatedAt() {
+        return createdAt;
+    }
+
+    public LocalDateTime getUpdatedAt() {
+        return updatedAt;
+    }
+
+    public List<TicketImage> getImages() {
+        return images;
+    }
+
+    public void addImage(TicketImage image) {
+        image.setTicket(this);
+        this.images.add(image);
+    }
+}
