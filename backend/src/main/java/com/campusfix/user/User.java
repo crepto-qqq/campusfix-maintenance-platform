@@ -9,6 +9,7 @@ import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.Lob;
 import jakarta.persistence.Table;
+import org.hibernate.annotations.ColumnDefault;
 
 @Entity
 @Table(name = "app_users")
@@ -28,6 +29,7 @@ public class User {
     private String password;
 
     @Enumerated(EnumType.STRING)
+    @ColumnDefault("'GENERAL_USER'")
     @Column(name = "role", nullable = false, length = 30)
     private Role role = Role.GENERAL_USER;
 

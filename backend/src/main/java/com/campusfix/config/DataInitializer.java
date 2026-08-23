@@ -10,6 +10,10 @@ import org.springframework.transaction.annotation.Transactional;
 @Component
 public class DataInitializer implements CommandLineRunner {
 
+    private static final String ADMIN_NAME = "Administrator";
+    private static final String ADMIN_EMAIL = "admin@campusfix.edu";
+    private static final String ADMIN_PASSWORD = "admin12345";
+
     private final UserRepository userRepository;
 
     public DataInitializer(UserRepository userRepository) {
@@ -19,10 +23,16 @@ public class DataInitializer implements CommandLineRunner {
     @Override
     @Transactional
     public void run(String... args) {
-        if (userRepository.count() == 0) {
-            User admin = new User("Administrator", "admin@campusfix.edu", "admin12345");
-            admin.setRole(Role.ADMINISTRATOR);
-            userRepository.save(admin);
+        for (User user : userRepository.findAll()) {
+            if (user.getRole() == null) {
+                user.setRole(Role.GENERAL_USER);
+                userRepository.save(user);
+            }
         }
+
+        User admin = userRepository.findByEmailIgnoreCase(ADMIN_EMAIL)
+                .orElseGet(() -> new User(ADMIN_NAME, ADMIN_EMAIL, ADMIN_PASSWORD));
+        admin.setRole(Role.ADMINISTRATOR);
+        userRepository.save(admin);
     }
 }
