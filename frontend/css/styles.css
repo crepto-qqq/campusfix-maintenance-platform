@@ -2,6 +2,10 @@
   box-sizing: border-box;
 }
 
+[hidden] {
+  display: none !important;
+}
+
 body {
   margin: 0;
   font-family: Arial, sans-serif;
@@ -106,6 +110,45 @@ button {
 
 .role-administrator {
   background: #b02a37;
+}
+
+.role-manager {
+  background: #1f7a55;
+}
+
+.field-help {
+  margin: -4px 0 4px;
+  color: #666;
+  font-size: 0.85rem;
+}
+
+.table-scroll {
+  overflow-x: auto;
+}
+
+.admin-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.admin-table th,
+.admin-table td {
+  padding: 12px;
+  border-bottom: 1px solid #ddd;
+  text-align: left;
+  vertical-align: middle;
+}
+
+.admin-table th {
+  background: #f3f6f8;
+}
+
+.admin-table select {
+  min-width: 170px;
+}
+
+.workspace-header-actions #logout-button {
+  margin-top: 0;
 }
 
 .card {

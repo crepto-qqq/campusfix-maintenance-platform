@@ -22,6 +22,9 @@ const ticketsMessage = document.getElementById('tickets-message');
 const profileForm = document.getElementById('profile-form');
 const avatarForm = document.getElementById('avatar-form');
 const profileAvatar = document.getElementById('profile-avatar');
+const adminPage = document.getElementById('admin-page');
+const adminUsersBody = document.getElementById('admin-users-body');
+const adminMessage = document.getElementById('admin-message');
 
 if (registrationForm) {
   registrationForm.addEventListener('submit', async (event) => {
@@ -90,7 +93,8 @@ if (loginForm) {
         throw new Error(`Login failed (${response.status}).`);
       }
 
-      window.location.href = './workspace.html';
+      const user = await response.json();
+      window.location.href = getLandingPage(user.role);
     } catch (error) {
       authMessage.textContent = error.message;
     }
@@ -111,7 +115,31 @@ async function initWorkspace() {
   }
 
   displayWorkspaceRole(user);
-  loadTickets();
+
+  if (user.role === 'GENERAL_USER') {
+    loadTickets();
+    return;
+  }
+
+  document.querySelectorAll('.requester-content').forEach((element) => {
+    element.hidden = true;
+  });
+
+  const roleMessage = document.getElementById('role-workspace-message');
+  const roleTitle = document.getElementById('role-workspace-title');
+  const roleDescription = document.getElementById('role-workspace-description');
+  roleMessage.hidden = false;
+  roleTitle.textContent = `${formatRole(user.role)} Workspace`;
+  const descriptions = {
+    MAINTENANCE_STAFF: 'Your account has Maintenance Staff access. Assigned-ticket tools will appear here when the assignment workflow is delivered.',
+    ADMINISTRATOR: 'Use Manage Users to maintain university identities and operational roles.',
+    MANAGER: 'Your account has Manager access. Management reporting tools will appear here when the reporting workflow is delivered.'
+  };
+  roleDescription.textContent = descriptions[user.role] ?? '';
+}
+
+function getLandingPage(role) {
+  return './workspace.html';
 }
 
 async function loadCurrentUser() {
@@ -140,14 +168,20 @@ function displayWorkspaceRole(user) {
   }
 
   const labels = {
-    GENERAL_USER: 'General User',
+    GENERAL_USER: 'Requester',
     MAINTENANCE_STAFF: 'Maintenance Staff',
-    ADMINISTRATOR: 'Administrator'
+    ADMINISTRATOR: 'Administrator',
+    MANAGER: 'Manager'
   };
 
   workspaceRole.textContent = labels[user.role] ?? user.role;
   workspaceRole.classList.add(`role-${user.role.toLowerCase()}`);
   workspaceRole.hidden = false;
+
+  const adminLink = document.getElementById('admin-link');
+  if (adminLink) {
+    adminLink.hidden = user.role !== 'ADMINISTRATOR';
+  }
 }
 
 async function loadTickets() {
@@ -602,6 +636,7 @@ async function loadProfile() {
 function displayProfile(user) {
   document.getElementById('profile-id').textContent = user.id;
   document.getElementById('profile-email').textContent = user.email;
+  document.getElementById('profile-identity-type').textContent = formatIdentityType(user.identityType);
   document.getElementById('profile-role').textContent = formatRole(user.role);
   document.getElementById('profile-name').value = user.name;
   document.getElementById('contact-information').value = user.contactInformation ?? '';
@@ -610,11 +645,138 @@ function displayProfile(user) {
 
 function formatRole(role) {
   const labels = {
-    GENERAL_USER: 'General User',
+    GENERAL_USER: 'Requester',
     MAINTENANCE_STAFF: 'Maintenance Staff',
-    ADMINISTRATOR: 'Administrator'
+    ADMINISTRATOR: 'Administrator',
+    MANAGER: 'Manager'
   };
   return labels[role] ?? role ?? '';
+}
+
+function formatIdentityType(identityType) {
+  const labels = {
+    STUDENT: 'Student',
+    CAMPUS_STAFF: 'Campus Staff'
+  };
+  return labels[identityType] ?? identityType ?? '';
+}
+
+if (adminPage) {
+  initAdminPage();
+}
+
+async function initAdminPage() {
+  const user = await loadCurrentUser();
+  if (!user) {
+    window.location.href = './index.html';
+    return;
+  }
+
+  if (user.role !== 'ADMINISTRATOR') {
+    window.location.href = getLandingPage(user.role);
+    return;
+  }
+
+  await loadAdminUsers();
+}
+
+async function loadAdminUsers() {
+  adminMessage.textContent = 'Loading users...';
+
+  try {
+    const response = await fetch(`${API_BASE_URL}/admin/users`, {
+      credentials: 'include'
+    });
+
+    if (response.status === 401) {
+      window.location.href = './index.html';
+      return;
+    }
+
+    if (response.status === 403) {
+      window.location.href = './workspace.html';
+      return;
+    }
+
+    if (!response.ok) {
+      throw new Error(`Loading users failed (${response.status}).`);
+    }
+
+    renderAdminUsers(await response.json());
+    adminMessage.textContent = '';
+  } catch (error) {
+    adminMessage.textContent = error.message;
+  }
+}
+
+function renderAdminUsers(users) {
+  adminUsersBody.innerHTML = '';
+
+  users.forEach((user) => {
+    const row = document.createElement('tr');
+    row.innerHTML = `
+      <td>${user.id}</td>
+      <td>${escapeHtml(user.name)}</td>
+      <td>${escapeHtml(user.email)}</td>
+      <td>
+        <select class="admin-identity-select" aria-label="Identity for ${escapeHtml(user.name)}">
+          ${createIdentityOptions(user.identityType)}
+        </select>
+      </td>
+      <td>
+        <select class="admin-role-select" aria-label="Role for ${escapeHtml(user.name)}">
+          ${createRoleOptions(user.role)}
+        </select>
+      </td>
+      <td><button type="button" class="admin-save-role">Save</button></td>
+    `;
+
+    row.querySelector('.admin-save-role').addEventListener('click', async () => {
+      const identityType = row.querySelector('.admin-identity-select').value;
+      const role = row.querySelector('.admin-role-select').value;
+      await updateAdminUserAccess(user.id, identityType, role);
+    });
+
+    adminUsersBody.appendChild(row);
+  });
+}
+
+function createIdentityOptions(selectedIdentityType) {
+  const identityTypes = ['STUDENT', 'CAMPUS_STAFF'];
+  return identityTypes.map((identityType) => `
+    <option value="${identityType}" ${identityType === selectedIdentityType ? 'selected' : ''}>${formatIdentityType(identityType)}</option>
+  `).join('');
+}
+
+function createRoleOptions(selectedRole) {
+  const roles = ['GENERAL_USER', 'MAINTENANCE_STAFF', 'ADMINISTRATOR', 'MANAGER'];
+  return roles.map((role) => `
+    <option value="${role}" ${role === selectedRole ? 'selected' : ''}>${formatRole(role)}</option>
+  `).join('');
+}
+
+async function updateAdminUserAccess(userId, identityType, role) {
+  adminMessage.textContent = 'Updating identity and role...';
+
+  try {
+    const response = await fetch(`${API_BASE_URL}/admin/users/${userId}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
+      body: JSON.stringify({ identityType, role })
+    });
+
+    if (!response.ok) {
+      const data = await response.json().catch(() => null);
+      throw new Error(data?.message ?? `User access update failed (${response.status}).`);
+    }
+
+    adminMessage.textContent = 'Identity and role updated.';
+    await loadAdminUsers();
+  } catch (error) {
+    await loadAdminUsers();
+    adminMessage.textContent = error.message;
+  }
 }
 
 async function loadAvatar() {

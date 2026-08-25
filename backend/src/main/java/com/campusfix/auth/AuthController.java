@@ -1,6 +1,7 @@
 package com.campusfix.auth;
 
 import com.campusfix.user.Role;
+import com.campusfix.user.IdentityType;
 import com.campusfix.user.User;
 import com.campusfix.user.UserService;
 import jakarta.servlet.http.HttpSession;
@@ -30,8 +31,17 @@ public class AuthController {
     @PostMapping("/register")
     @ResponseStatus(HttpStatus.CREATED)
     public RegistrationResponse register(@Valid @RequestBody RegistrationRequest request) {
-        User user = userService.register(request.name(), request.email(), request.password());
-        return new RegistrationResponse(user.getId(), user.getName(), user.getEmail(), user.getRole());
+        User user = userService.register(
+                request.name(),
+                request.email(),
+                request.password(),
+                IdentityType.STUDENT);
+        return new RegistrationResponse(
+                user.getId(),
+                user.getName(),
+                user.getEmail(),
+                user.getIdentityType(),
+                user.getRole());
     }
 
     @PostMapping("/login")
@@ -40,7 +50,12 @@ public class AuthController {
             HttpSession session) {
         User user = userService.login(request.email(), request.password());
         session.setAttribute("userId", user.getId());
-        return new LoginResponse(user.getId(), user.getName(), user.getEmail(), user.getRole());
+        return new LoginResponse(
+                user.getId(),
+                user.getName(),
+                user.getEmail(),
+                user.getIdentityType(),
+                user.getRole());
     }
 
     @PostMapping("/logout")
@@ -49,9 +64,19 @@ public class AuthController {
         session.invalidate();
     }
 
-    public record RegistrationResponse(Long id, String name, String email, Role role) {
+    public record RegistrationResponse(
+            Long id,
+            String name,
+            String email,
+            IdentityType identityType,
+            Role role) {
     }
 
-    public record LoginResponse(Long id, String name, String email, Role role) {
+    public record LoginResponse(
+            Long id,
+            String name,
+            String email,
+            IdentityType identityType,
+            Role role) {
     }
 }

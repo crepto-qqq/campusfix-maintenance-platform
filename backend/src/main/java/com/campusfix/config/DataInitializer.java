@@ -1,6 +1,7 @@
 package com.campusfix.config;
 
 import com.campusfix.user.Role;
+import com.campusfix.user.IdentityType;
 import com.campusfix.user.User;
 import com.campusfix.user.UserRepository;
 import org.springframework.boot.CommandLineRunner;
@@ -28,10 +29,20 @@ public class DataInitializer implements CommandLineRunner {
                 user.setRole(Role.GENERAL_USER);
                 userRepository.save(user);
             }
+
+            if (user.getIdentityType() == null) {
+                user.setIdentityType(IdentityType.STUDENT);
+                userRepository.save(user);
+            }
         }
 
         User admin = userRepository.findByEmailIgnoreCase(ADMIN_EMAIL)
-                .orElseGet(() -> new User(ADMIN_NAME, ADMIN_EMAIL, ADMIN_PASSWORD));
+                .orElseGet(() -> new User(
+                        ADMIN_NAME,
+                        ADMIN_EMAIL,
+                        ADMIN_PASSWORD,
+                        IdentityType.CAMPUS_STAFF));
+        admin.setIdentityType(IdentityType.CAMPUS_STAFF);
         admin.setRole(Role.ADMINISTRATOR);
         userRepository.save(admin);
     }

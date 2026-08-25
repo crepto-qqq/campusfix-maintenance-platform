@@ -20,7 +20,8 @@ import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.server.ResponseStatusException;
 
 import com.campusfix.user.User;
-import com.campusfix.user.UserService;
+import com.campusfix.user.AccessControlService;
+import com.campusfix.user.Role;
 
 import jakarta.servlet.http.HttpSession;
 import jakarta.validation.Valid;
@@ -37,11 +38,13 @@ public class TicketController {
     private static final int MAX_IMAGES_PER_TICKET = 5;
 
     private final TicketService ticketService;
-    private final UserService userService;
+    private final AccessControlService accessControlService;
 
-    public TicketController(TicketService ticketService, UserService userService) {
+    public TicketController(
+            TicketService ticketService,
+            AccessControlService accessControlService) {
         this.ticketService = ticketService;
-        this.userService = userService;
+        this.accessControlService = accessControlService;
     }
 
     @PostMapping
@@ -49,14 +52,14 @@ public class TicketController {
     public TicketResponse createTicket(
             @Valid @RequestBody TicketRequest request,
             HttpSession session) {
-        User user = userService.getProfile(getLoggedInUserId(session));
+        User user = accessControlService.requireRole(session, Role.GENERAL_USER);
         Ticket ticket = ticketService.createTicket(request, user);
         return createTicketResponse(ticket);
     }
 
     @GetMapping
     public List<TicketResponse> getMyTickets(HttpSession session) {
-        Long userId = getLoggedInUserId(session);
+        Long userId = getRequesterId(session);
         return ticketService.getTicketsForUser(userId).stream()
                 .map(this::createTicketResponse)
                 .toList();
@@ -64,47 +67,47 @@ public class TicketController {
 
     @GetMapping("/{ticketId}")
     public TicketResponse getTicket(
-            @PathVariable Long ticketId,
+            @PathVariable("ticketId") Long ticketId,
             HttpSession session) {
         Ticket ticket = ticketService.getTicketForUser(
                 ticketId,
-                getLoggedInUserId(session));
+                getRequesterId(session));
         return createTicketResponse(ticket);
     }
 
     @PutMapping("/{ticketId}")
     public TicketResponse updateTicket(
-            @PathVariable Long ticketId,
+            @PathVariable("ticketId") Long ticketId,
             @Valid @RequestBody TicketRequest request,
             HttpSession session) {
         Ticket ticket = ticketService.updateTicket(
                 ticketId,
-                getLoggedInUserId(session),
+                getRequesterId(session),
                 request);
         return createTicketResponse(ticket);
     }
 
     @PostMapping("/{ticketId}/cancel")
     public TicketResponse cancelTicket(
-            @PathVariable Long ticketId,
+            @PathVariable("ticketId") Long ticketId,
             HttpSession session) {
         Ticket ticket = ticketService.cancelTicket(
                 ticketId,
-                getLoggedInUserId(session));
+                getRequesterId(session));
         return createTicketResponse(ticket);
     }
 
     @PostMapping(value = "/{ticketId}/images", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void uploadImage(
-            @PathVariable Long ticketId,
+            @PathVariable("ticketId") Long ticketId,
             @RequestParam("image") MultipartFile image,
             HttpSession session) {
         validateImage(image);
 
         Ticket ticket = ticketService.getTicketForUser(
                 ticketId,
-                getLoggedInUserId(session));
+                getRequesterId(session));
 
         if (ticket.getImages().size() >= MAX_IMAGES_PER_TICKET) {
             throw new ResponseStatusException(
@@ -112,29 +115,29 @@ public class TicketController {
                     "A request cannot have more than " + MAX_IMAGES_PER_TICKET + " images");
         }
 
-        ticketService.addTicketImage(ticketId, getLoggedInUserId(session), image);
+        ticketService.addTicketImage(ticketId, getRequesterId(session), image);
     }
 
     @DeleteMapping("/{ticketId}/images/{imageId}")
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void deleteImage(
-            @PathVariable Long ticketId,
-            @PathVariable Long imageId,
+            @PathVariable("ticketId") Long ticketId,
+            @PathVariable("imageId") Long imageId,
             HttpSession session) {
         ticketService.deleteTicketImage(
                 ticketId,
-                getLoggedInUserId(session),
+                getRequesterId(session),
                 imageId);
     }
 
     @GetMapping("/{ticketId}/images/{imageId}")
     public ResponseEntity<byte[]> getImage(
-            @PathVariable Long ticketId,
-            @PathVariable Long imageId,
+            @PathVariable("ticketId") Long ticketId,
+            @PathVariable("imageId") Long imageId,
             HttpSession session) {
         TicketImage image = ticketService.getTicketImage(
                 ticketId,
-                getLoggedInUserId(session),
+                getRequesterId(session),
                 imageId);
 
         return ResponseEntity.ok()
@@ -157,14 +160,8 @@ public class TicketController {
         }
     }
 
-    private Long getLoggedInUserId(HttpSession session) {
-        Object userId = session.getAttribute("userId");
-
-        if (userId instanceof Long id) {
-            return id;
-        }
-
-        throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Login is required");
+    private Long getRequesterId(HttpSession session) {
+        return accessControlService.requireRole(session, Role.GENERAL_USER).getId();
     }
 
     private TicketResponse createTicketResponse(Ticket ticket) {

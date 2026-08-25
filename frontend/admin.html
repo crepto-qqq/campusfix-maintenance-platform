@@ -1,0 +1,50 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>User Administration | CampusFix</title>
+    <link rel="stylesheet" href="./css/styles.css">
+  </head>
+  <body>
+    <main class="workspace-container" id="admin-page">
+      <header class="workspace-header">
+        <div>
+          <h1>CampusFix</h1>
+          <p>User Administration</p>
+        </div>
+        <div class="workspace-header-actions">
+          <span id="admin-role" class="role-badge role-administrator">Administrator</span>
+          <a class="workspace-profile-button" href="./profile.html">Profile</a>
+          <button id="logout-button" type="button" class="secondary-button">Logout</button>
+        </div>
+      </header>
+
+      <section class="card">
+        <h2>Users and Roles</h2>
+        <p>Registration creates a Student Requester account. Use this table to update university identity and operational role.</p>
+        <p id="admin-message" role="status">Loading users...</p>
+
+        <div class="table-scroll">
+          <table class="admin-table">
+            <thead>
+              <tr>
+                <th>ID</th>
+                <th>Name</th>
+                <th>Email</th>
+                <th>Identity</th>
+                <th>Role</th>
+                <th>Save changes</th>
+              </tr>
+            </thead>
+            <tbody id="admin-users-body"></tbody>
+          </table>
+        </div>
+      </section>
+
+      <p id="auth-message" role="status"></p>
+    </main>
+
+    <script src="./js/app.js"></script>
+  </body>
+</html>

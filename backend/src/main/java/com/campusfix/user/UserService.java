@@ -17,14 +17,14 @@ public class UserService {
     }
 
     @Transactional
-    public User register(String name, String email, String password) {
+    public User register(String name, String email, String password, IdentityType identityType) {
         String normalizedEmail = email.trim().toLowerCase(Locale.ROOT);
 
         if (userRepository.existsByEmailIgnoreCase(normalizedEmail)) {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "Email is already registered");
         }
 
-        User user = new User(name.trim(), normalizedEmail, password);
+        User user = new User(name.trim(), normalizedEmail, password, identityType);
         return userRepository.save(user);
     }
 
@@ -74,8 +74,29 @@ public class UserService {
     @Transactional
     public User updateRole(Long userId, Role role) {
         User user = findUserById(userId);
+        return updateAccess(userId, user.getIdentityType(), role);
+    }
+
+    @Transactional
+    public User updateAccess(Long userId, IdentityType identityType, Role role) {
+        User user = findUserById(userId);
+
+        if (user.getRole() == Role.ADMINISTRATOR
+                && role != Role.ADMINISTRATOR
+                && userRepository.countByRole(Role.ADMINISTRATOR) <= 1) {
+            throw new ResponseStatusException(
+                    HttpStatus.CONFLICT,
+                    "The last administrator cannot be demoted");
+        }
+
+        user.setIdentityType(identityType);
         user.setRole(role);
         return userRepository.save(user);
+    }
+
+    @Transactional(readOnly = true)
+    public java.util.List<User> getAllUsers() {
+        return userRepository.findAllByOrderByNameAscEmailAsc();
     }
 
     private User findUserById(Long userId) {

@@ -29,6 +29,11 @@ public class User {
     private String password;
 
     @Enumerated(EnumType.STRING)
+    @ColumnDefault("'STUDENT'")
+    @Column(name = "identity_type", nullable = false, length = 30)
+    private IdentityType identityType = IdentityType.STUDENT;
+
+    @Enumerated(EnumType.STRING)
     @ColumnDefault("'GENERAL_USER'")
     @Column(name = "role", nullable = false, length = 30)
     private Role role = Role.GENERAL_USER;
@@ -49,10 +54,11 @@ public class User {
     protected User() {
     }
 
-    public User(String name, String email, String password) {
+    public User(String name, String email, String password, IdentityType identityType) {
         this.name = name;
         this.email = email;
         this.password = password;
+        this.identityType = identityType;
     }
 
     public Long getId() {
@@ -73,6 +79,14 @@ public class User {
 
     public String getPassword() {
         return password;
+    }
+
+    public IdentityType getIdentityType() {
+        return identityType;
+    }
+
+    public void setIdentityType(IdentityType identityType) {
+        this.identityType = identityType;
     }
 
     public Role getRole() {
