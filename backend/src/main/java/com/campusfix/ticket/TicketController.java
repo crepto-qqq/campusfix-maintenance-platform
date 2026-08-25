@@ -58,9 +58,9 @@ public class TicketController {
     }
 
     @GetMapping
-    public List<TicketResponse> getMyTickets(HttpSession session) {
-        Long userId = getRequesterId(session);
-        return ticketService.getTicketsForUser(userId).stream()
+    public List<TicketResponse> getVisibleTickets(HttpSession session) {
+        User viewer = accessControlService.requireAuthenticatedUser(session);
+        return ticketService.getTicketsForViewer(viewer).stream()
                 .map(this::createTicketResponse)
                 .toList();
     }
@@ -69,10 +69,19 @@ public class TicketController {
     public TicketResponse getTicket(
             @PathVariable("ticketId") Long ticketId,
             HttpSession session) {
-        Ticket ticket = ticketService.getTicketForUser(
-                ticketId,
-                getRequesterId(session));
+        User viewer = accessControlService.requireAuthenticatedUser(session);
+        Ticket ticket = ticketService.getTicketForViewer(ticketId, viewer);
         return createTicketResponse(ticket);
+    }
+
+    @GetMapping("/{ticketId}/history")
+    public List<TicketHistoryResponse> getTicketHistory(
+            @PathVariable("ticketId") Long ticketId,
+            HttpSession session) {
+        User viewer = accessControlService.requireAuthenticatedUser(session);
+        return ticketService.getTicketHistory(ticketId, viewer).stream()
+                .map(this::createHistoryResponse)
+                .toList();
     }
 
     @PutMapping("/{ticketId}")
@@ -135,10 +144,8 @@ public class TicketController {
             @PathVariable("ticketId") Long ticketId,
             @PathVariable("imageId") Long imageId,
             HttpSession session) {
-        TicketImage image = ticketService.getTicketImage(
-                ticketId,
-                getRequesterId(session),
-                imageId);
+        User viewer = accessControlService.requireAuthenticatedUser(session);
+        TicketImage image = ticketService.getTicketImage(ticketId, viewer, imageId);
 
         return ResponseEntity.ok()
                 .contentType(MediaType.parseMediaType(image.getContentType()))
@@ -179,7 +186,22 @@ public class TicketController {
                 ticket.getStatus(),
                 ticket.getCreatedAt(),
                 ticket.getUpdatedAt(),
+                ticket.getSubmittedBy().getId(),
+                ticket.getSubmittedBy().getName(),
+                ticket.getSubmittedBy().getEmail(),
                 imageIds);
+    }
+
+    private TicketHistoryResponse createHistoryResponse(TicketHistory history) {
+        return new TicketHistoryResponse(
+                history.getId(),
+                history.getEventType(),
+                history.getPreviousValue(),
+                history.getNewValue(),
+                history.getReason(),
+                history.getActor().getId(),
+                history.getActor().getName(),
+                history.getOccurredAt());
     }
 
     public record TicketResponse(
@@ -192,6 +214,20 @@ public class TicketController {
             TicketStatus status,
             java.time.LocalDateTime createdAt,
             java.time.LocalDateTime updatedAt,
+            Long submittedById,
+            String submittedByName,
+            String submittedByEmail,
             List<Long> imageIds) {
+    }
+
+    public record TicketHistoryResponse(
+            Long id,
+            TicketEventType eventType,
+            String previousValue,
+            String newValue,
+            String reason,
+            Long actorId,
+            String actorName,
+            java.time.LocalDateTime occurredAt) {
     }
 }

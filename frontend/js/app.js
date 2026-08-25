@@ -19,6 +19,9 @@ const ticketIdInput = document.getElementById('ticket-id');
 const ticketMessage = document.getElementById('ticket-message');
 const ticketsList = document.getElementById('tickets-list');
 const ticketsMessage = document.getElementById('tickets-message');
+const allRequestsSection = document.getElementById('all-requests-section');
+const allTicketsList = document.getElementById('all-tickets-list');
+const allTicketsMessage = document.getElementById('all-tickets-message');
 const profileForm = document.getElementById('profile-form');
 const avatarForm = document.getElementById('avatar-form');
 const profileAvatar = document.getElementById('profile-avatar');
@@ -132,10 +135,15 @@ async function initWorkspace() {
   roleTitle.textContent = `${formatRole(user.role)} Workspace`;
   const descriptions = {
     MAINTENANCE_STAFF: 'Your account has Maintenance Staff access. Assigned-ticket tools will appear here when the assignment workflow is delivered.',
-    ADMINISTRATOR: 'Use Manage Users to maintain university identities and operational roles.',
-    MANAGER: 'Your account has Manager access. Management reporting tools will appear here when the reporting workflow is delivered.'
+    ADMINISTRATOR: 'Review all maintenance requests below, or use Manage Users to maintain university identities and operational roles.',
+    MANAGER: 'Review all maintenance requests below. Management reporting tools will appear here when the reporting workflow is delivered.'
   };
   roleDescription.textContent = descriptions[user.role] ?? '';
+
+  if (user.role === 'ADMINISTRATOR' || user.role === 'MANAGER') {
+    allRequestsSection.hidden = false;
+    await loadAllTickets();
+  }
 }
 
 function getLandingPage(role) {
@@ -208,6 +216,29 @@ async function loadTickets() {
   }
 }
 
+async function loadAllTickets() {
+  allTicketsMessage.textContent = 'Loading requests...';
+
+  try {
+    const response = await fetch(`${API_BASE_URL}/tickets`, {
+      credentials: 'include'
+    });
+
+    if (response.status === 401) {
+      window.location.href = './index.html';
+      return;
+    }
+
+    if (!response.ok) {
+      throw new Error(`Loading requests failed (${response.status}).`);
+    }
+
+    renderAllTickets(await response.json());
+  } catch (error) {
+    allTicketsMessage.textContent = error.message;
+  }
+}
+
 function renderTickets(tickets) {
   if (!tickets || tickets.length === 0) {
     ticketsMessage.textContent = 'You have no maintenance requests yet.';
@@ -223,13 +254,28 @@ function renderTickets(tickets) {
   });
 }
 
-function renderTicket(ticket) {
+function renderAllTickets(tickets) {
+  if (!tickets || tickets.length === 0) {
+    allTicketsMessage.textContent = 'No maintenance requests have been submitted yet.';
+    allTicketsList.innerHTML = '';
+    return;
+  }
+
+  allTicketsMessage.textContent = '';
+  allTicketsList.innerHTML = '';
+
+  tickets.forEach((ticket) => {
+    allTicketsList.appendChild(renderTicket(ticket, true));
+  });
+}
+
+function renderTicket(ticket, readOnly = false) {
   const article = document.createElement('article');
   article.className = 'ticket-card';
   article.dataset.ticketId = ticket.id;
 
-  const canEdit = ticket.status === 'PENDING';
-  const canCancel = ticket.status === 'PENDING';
+  const canEdit = !readOnly && ticket.status === 'SUBMITTED';
+  const canCancel = !readOnly && ticket.status === 'SUBMITTED';
 
   article.innerHTML = `
     <div class="ticket-card-header">
@@ -243,13 +289,16 @@ function renderTicket(ticket) {
       &middot;
       <span class="urgency-${ticket.urgency.toLowerCase()}">${formatUrgency(ticket.urgency)}</span>
     </p>
+    ${readOnly ? `<p class="ticket-dates"><strong>Submitted by:</strong> ${escapeHtml(ticket.submittedByName)} (${escapeHtml(ticket.submittedByEmail)})</p>` : ''}
     <p class="ticket-description">${escapeHtml(ticket.description)}</p>
     <p class="ticket-dates">Submitted: ${formatDate(ticket.createdAt)}</p>
     <div class="ticket-images" data-ticket-id="${ticket.id}"></div>
     <div class="ticket-card-actions">
       ${canEdit ? `<button type="button" class="ticket-edit-button" data-ticket-id="${ticket.id}">Edit</button>` : ''}
       ${canCancel ? `<button type="button" class="ticket-cancel-button secondary-danger" data-ticket-id="${ticket.id}">Cancel Request</button>` : ''}
+      <button type="button" class="ticket-history-button" data-ticket-id="${ticket.id}">View History</button>
     </div>
+    <div class="ticket-history" data-ticket-id="${ticket.id}" hidden></div>
   `;
 
   article.querySelectorAll('.ticket-edit-button').forEach((button) => {
@@ -260,9 +309,97 @@ function renderTicket(ticket) {
     button.addEventListener('click', () => confirmCancelTicket(ticket.id));
   });
 
+  article.querySelectorAll('.ticket-history-button').forEach((button) => {
+    button.addEventListener('click', () => toggleTicketHistory(
+      ticket.id,
+      article.querySelector('.ticket-history'),
+      button
+    ));
+  });
+
   loadTicketImages(ticket.id, ticket.imageIds, article.querySelector('.ticket-images'));
 
   return article;
+}
+
+async function toggleTicketHistory(ticketId, container, button) {
+  if (!container.hidden) {
+    container.hidden = true;
+    button.textContent = 'View History';
+    return;
+  }
+
+  container.hidden = false;
+  button.textContent = 'Hide History';
+
+  if (container.dataset.loaded === 'true') {
+    return;
+  }
+
+  container.innerHTML = '<p>Loading history...</p>';
+
+  try {
+    const response = await fetch(`${API_BASE_URL}/tickets/${ticketId}/history`, {
+      credentials: 'include'
+    });
+
+    if (response.status === 401) {
+      window.location.href = './index.html';
+      return;
+    }
+
+    if (!response.ok) {
+      throw new Error(`Loading history failed (${response.status}).`);
+    }
+
+    renderTicketHistory(await response.json(), container);
+    container.dataset.loaded = 'true';
+  } catch (error) {
+    container.innerHTML = `<p>${escapeHtml(error.message)}</p>`;
+  }
+}
+
+function renderTicketHistory(historyItems, container) {
+  if (!historyItems || historyItems.length === 0) {
+    container.innerHTML = '<p>No history is available for this request.</p>';
+    return;
+  }
+
+  container.innerHTML = `
+    <h4>Request History</h4>
+    <ol class="history-timeline">
+      ${historyItems.map((item) => `
+        <li>
+          <div class="history-heading">
+            <strong>${formatHistoryEvent(item.eventType)}</strong>
+            <time>${formatDate(item.occurredAt)}</time>
+          </div>
+          <p>By ${escapeHtml(item.actorName)}</p>
+          ${item.previousValue ? `<details><summary>Previous value</summary><pre>${escapeHtml(item.previousValue)}</pre></details>` : ''}
+          ${item.newValue ? `<details><summary>New value</summary><pre>${escapeHtml(item.newValue)}</pre></details>` : ''}
+          ${item.reason ? `<p>Reason: ${escapeHtml(item.reason)}</p>` : ''}
+        </li>
+      `).join('')}
+    </ol>
+  `;
+}
+
+function formatHistoryEvent(eventType) {
+  const labels = {
+    LEGACY_IMPORTED: 'Existing Request Imported',
+    TICKET_CREATED: 'Request Created',
+    TICKET_UPDATED: 'Request Updated',
+    TICKET_CANCELLED: 'Request Cancelled',
+    IMAGE_ADDED: 'Image Added',
+    IMAGE_REMOVED: 'Image Removed',
+    PRIORITY_CHANGED: 'Priority Changed',
+    TICKET_ASSIGNED: 'Request Assigned',
+    TICKET_REASSIGNED: 'Request Reassigned',
+    STATUS_CHANGED: 'Status Changed',
+    RESOLUTION_CONFIRMED: 'Resolution Confirmed',
+    TICKET_REOPENED: 'Request Reopened'
+  };
+  return labels[eventType] ?? eventType;
 }
 
 async function loadTicketImages(ticketId, imageIds, container) {
@@ -457,10 +594,12 @@ async function confirmCancelTicket(ticketId) {
 
 function formatStatus(status) {
   const labels = {
-    PENDING: 'Pending',
+    SUBMITTED: 'Submitted',
     ASSIGNED: 'Assigned',
     IN_PROGRESS: 'In Progress',
     COMPLETED: 'Completed',
+    CLOSED: 'Closed',
+    REOPENED: 'Reopened',
     CANCELLED: 'Cancelled'
   };
   return labels[status] ?? status;

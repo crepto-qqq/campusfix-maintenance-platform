@@ -221,7 +221,7 @@ button {
   font-size: 0.8rem;
 }
 
-.status-pending {
+.status-submitted {
   background: #f0ad4e;
 }
 
@@ -235,6 +235,14 @@ button {
 
 .status-completed {
   background: #28a745;
+}
+
+.status-closed {
+  background: #1f7a55;
+}
+
+.status-reopened {
+  background: #d97706;
 }
 
 .status-cancelled {
@@ -320,6 +328,56 @@ button {
   background: #b02a37;
   cursor: pointer;
   font: inherit;
+}
+
+.ticket-history-button {
+  padding: 8px 16px;
+  border: 0;
+  border-radius: 4px;
+  color: #fff;
+  background: #555;
+  cursor: pointer;
+  font: inherit;
+}
+
+.ticket-history {
+  margin-top: 16px;
+  padding-top: 16px;
+  border-top: 1px solid #ddd;
+}
+
+.ticket-history h4 {
+  margin: 0 0 12px;
+}
+
+.history-timeline {
+  display: grid;
+  gap: 12px;
+  margin: 0;
+  padding-left: 24px;
+}
+
+.history-timeline li {
+  padding: 12px;
+  border-left: 3px solid #1769aa;
+  background: #f7f9fb;
+}
+
+.history-heading {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.history-timeline p {
+  margin: 8px 0 0;
+}
+
+.history-timeline pre {
+  overflow-x: auto;
+  white-space: pre-wrap;
+  word-break: break-word;
 }
 
 .profile-avatar {
