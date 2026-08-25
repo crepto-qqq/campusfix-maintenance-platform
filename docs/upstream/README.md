@@ -95,6 +95,12 @@ On Windows, use `.\gradlew.bat bootRun` for the back-end command.
 
 Open `frontend/index.html` directly in a browser, or use the VS Code Live Server extension.
 
+## Database Design
+
+The authentication account, user profile, campus identity and role assignments are stored in normalized relational tables. See [Database ERD and user normalization](docs/Database-ERD-User-Normalization.md).
+
+The Gradle `bootRun` task and VS Code both use the repository-level `data/campusfix` H2 database. Existing legacy user data is migrated automatically on first startup.
+
 ## Team Members and Responsibilities
 
 | Team Member | Primary Role | Responsibilities |

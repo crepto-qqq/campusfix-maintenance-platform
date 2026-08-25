@@ -43,8 +43,8 @@ public class AdminUserController {
             @PathVariable("userId") Long userId,
             @Valid @RequestBody RoleUpdateRequest request,
             HttpSession session) {
-        accessControlService.requireRole(session, Role.ADMINISTRATOR);
-        return createResponse(userService.updateRole(userId, request.role()));
+        User administrator = accessControlService.requireRole(session, Role.ADMINISTRATOR);
+        return createResponse(userService.updateRole(userId, request.role(), administrator));
     }
 
     @PutMapping("/{userId}")
@@ -52,11 +52,12 @@ public class AdminUserController {
             @PathVariable("userId") Long userId,
             @Valid @RequestBody AdminUserUpdateRequest request,
             HttpSession session) {
-        accessControlService.requireRole(session, Role.ADMINISTRATOR);
+        User administrator = accessControlService.requireRole(session, Role.ADMINISTRATOR);
         return createResponse(userService.updateAccess(
                 userId,
                 request.identityType(),
-                request.role()));
+                request.role(),
+                administrator));
     }
 
     private AdminUserResponse createResponse(User user) {
