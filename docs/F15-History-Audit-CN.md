@@ -9,8 +9,10 @@ F15为工单增加不可由普通用户直接修改的审计历史。当前以�
 - `TICKET_CANCELLED`
 - `IMAGE_ADDED`
 - `IMAGE_REMOVED`
+- `PRIORITY_CHANGED`
+- `TICKET_ASSIGNED`
 
-同时预留了Priority、Assignment、Reassignment、Status Change、Resolution和Reopen事件类型，供F11–F14及F18直接使用。
+Priority事件已由F11正式使用，Assignment事件已由F12正式使用；同时预留Reassignment、Status Change、Resolution和Reopen事件类型，供F13–F14及F18直接使用。
 
 ## 历史数据
 
@@ -56,3 +58,5 @@ Requester工单卡片增加 `View History` 按钮。Timeline显示事件、操�
 - Another Requester cannot read the history and receives `403`.
 - Administrator can read the history and receives `200`.
 - Existing database copy starts successfully and receives legacy history backfill.
+- Priority changes record old/new values, administrator, time and optional reason, and persist after restart.
+- Initial assignment records the old/new status and assignee, administrator and time, and persists atomically with Assignment and Notification.

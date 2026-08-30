@@ -7,8 +7,8 @@ import org.springframework.data.jpa.repository.EntityGraph;
 
 public interface TicketHistoryRepository extends JpaRepository<TicketHistory, Long> {
 
-    @EntityGraph(attributePaths = "actor")
-    List<TicketHistory> findByTicketIdOrderByOccurredAtAscIdAsc(Long ticketId);
+    @EntityGraph(attributePaths = {"actor", "actor.profile"})
+    List<TicketHistory> findByTicket_IdOrderByOccurredAtAscIdAsc(Long ticketId);
 
-    boolean existsByTicketId(Long ticketId);
+    boolean existsByTicket_Id(Long ticketId);
 }

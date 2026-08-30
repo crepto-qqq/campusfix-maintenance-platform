@@ -65,6 +65,20 @@ public class TicketController {
                 .toList();
     }
 
+    @GetMapping("/priority-summary")
+    public TicketPrioritySummary getPrioritySummary(HttpSession session) {
+        User viewer = accessControlService.requireAuthenticatedUser(session);
+        return ticketService.getPrioritySummary(viewer);
+    }
+
+    @GetMapping("/technicians")
+    public List<TechnicianResponse> getAssignableTechnicians(HttpSession session) {
+        User administrator = accessControlService.requireRole(session, Role.ADMINISTRATOR);
+        return ticketService.getAssignableTechnicians(administrator).stream()
+                .map(user -> new TechnicianResponse(user.getId(), user.getName(), user.getEmail()))
+                .toList();
+    }
+
     @GetMapping("/{ticketId}")
     public TicketResponse getTicket(
             @PathVariable("ticketId") Long ticketId,
@@ -82,6 +96,32 @@ public class TicketController {
         return ticketService.getTicketHistory(ticketId, viewer).stream()
                 .map(this::createHistoryResponse)
                 .toList();
+    }
+
+    @PutMapping("/{ticketId}/priority")
+    public TicketResponse updatePriority(
+            @PathVariable("ticketId") Long ticketId,
+            @Valid @RequestBody TicketPriorityUpdateRequest request,
+            HttpSession session) {
+        User administrator = accessControlService.requireRole(session, Role.ADMINISTRATOR);
+        Ticket ticket = ticketService.updateOperationalPriority(
+                ticketId,
+                request.priority(),
+                request.reason(),
+                administrator);
+        return createTicketResponse(ticket);
+    }
+
+    @PostMapping("/{ticketId}/assignment")
+    public TicketResponse assignTicket(
+            @PathVariable("ticketId") Long ticketId,
+            @Valid @RequestBody TicketAssignmentRequest request,
+            HttpSession session) {
+        User administrator = accessControlService.requireRole(session, Role.ADMINISTRATOR);
+        return createTicketResponse(ticketService.assignTicket(
+                ticketId,
+                request.technicianId(),
+                administrator));
     }
 
     @PutMapping("/{ticketId}")
@@ -175,6 +215,7 @@ public class TicketController {
         List<Long> imageIds = ticket.getImages().stream()
                 .map(TicketImage::getId)
                 .toList();
+        TicketAssignment assignment = ticket.getActiveAssignment();
 
         return new TicketResponse(
                 ticket.getId(),
@@ -183,6 +224,11 @@ public class TicketController {
                 ticket.getCategory(),
                 ticket.getLocation(),
                 ticket.getUrgency(),
+                ticket.getOperationalPriority(),
+                assignment == null ? null : assignment.getTechnician().getId(),
+                assignment == null ? null : assignment.getTechnician().getName(),
+                assignment == null ? null : assignment.getTechnician().getEmail(),
+                assignment == null ? null : assignment.getAssignedAt(),
                 ticket.getStatus(),
                 ticket.getCreatedAt(),
                 ticket.getUpdatedAt(),
@@ -195,6 +241,7 @@ public class TicketController {
     private TicketHistoryResponse createHistoryResponse(TicketHistory history) {
         return new TicketHistoryResponse(
                 history.getId(),
+                history.getTicketId(),
                 history.getEventType(),
                 history.getPreviousValue(),
                 history.getNewValue(),
@@ -211,6 +258,11 @@ public class TicketController {
             TicketCategory category,
             String location,
             UrgencyLevel urgency,
+            TicketPriority operationalPriority,
+            Long assignedTechnicianId,
+            String assignedTechnicianName,
+            String assignedTechnicianEmail,
+            java.time.LocalDateTime assignedAt,
             TicketStatus status,
             java.time.LocalDateTime createdAt,
             java.time.LocalDateTime updatedAt,
@@ -222,6 +274,7 @@ public class TicketController {
 
     public record TicketHistoryResponse(
             Long id,
+            Long ticketId,
             TicketEventType eventType,
             String previousValue,
             String newValue,
@@ -229,5 +282,11 @@ public class TicketController {
             Long actorId,
             String actorName,
             java.time.LocalDateTime occurredAt) {
+    }
+
+    public record TechnicianResponse(
+            Long id,
+            String name,
+            String email) {
     }
 }

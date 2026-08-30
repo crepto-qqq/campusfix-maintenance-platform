@@ -278,6 +278,35 @@ button {
   font-weight: bold;
 }
 
+.ticket-priority {
+  margin: 8px 0;
+}
+
+.priority-unset {
+  color: #777;
+}
+
+.priority-low {
+  color: #287d3c;
+  font-weight: bold;
+}
+
+.priority-medium {
+  color: #b46900;
+  font-weight: bold;
+}
+
+.priority-high {
+  color: #c0392b;
+  font-weight: bold;
+}
+
+.priority-critical {
+  color: #8b0000;
+  font-weight: bold;
+  text-transform: uppercase;
+}
+
 .ticket-description {
   white-space: pre-wrap;
   margin: 8px 0;
@@ -344,6 +373,129 @@ button {
   margin-top: 16px;
   padding-top: 16px;
   border-top: 1px solid #ddd;
+}
+
+.priority-management {
+  margin-top: 16px;
+  padding-top: 16px;
+  border-top: 1px solid #ddd;
+}
+
+.priority-management > label {
+  display: block;
+  margin-bottom: 8px;
+  font-weight: bold;
+}
+
+.priority-management-controls {
+  display: grid;
+  grid-template-columns: minmax(150px, 0.8fr) minmax(220px, 2fr) auto;
+  gap: 8px;
+  align-items: end;
+}
+
+.priority-management-controls select,
+.priority-management-controls input {
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.ticket-priority-save {
+  white-space: nowrap;
+}
+
+.ticket-priority-message {
+  min-height: 20px;
+  margin: 8px 0 0;
+}
+
+.ticket-assignment {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 8px 0;
+}
+
+.assignment-unassigned {
+  color: #777;
+}
+
+.assignment-time {
+  flex-basis: 100%;
+  color: #777;
+  font-size: 0.85rem;
+}
+
+.assignment-management {
+  margin-top: 16px;
+  padding-top: 16px;
+  border-top: 1px solid #ddd;
+}
+
+.assignment-management > label {
+  display: block;
+  margin-bottom: 8px;
+  font-weight: bold;
+}
+
+.assignment-management-controls {
+  display: grid;
+  grid-template-columns: minmax(240px, 1fr) auto;
+  gap: 8px;
+  align-items: end;
+}
+
+.assignment-management-controls select {
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.ticket-assignment-save {
+  white-space: nowrap;
+}
+
+.ticket-assignment-message {
+  min-height: 20px;
+  margin: 8px 0 0;
+}
+
+.priority-summary {
+  margin: 16px 0 20px;
+  padding: 16px;
+  border: 1px solid #d8e0e8;
+  border-radius: 6px;
+  background: #f7f9fb;
+}
+
+.priority-summary h3 {
+  margin: 0 0 12px;
+}
+
+.priority-summary-values {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+  gap: 10px;
+}
+
+.priority-summary-item {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 10px;
+  border: 1px solid #e1e6eb;
+  border-radius: 4px;
+  background: #fff;
+}
+
+.priority-summary-item strong {
+  font-size: 1.15rem;
+}
+
+@media (max-width: 720px) {
+  .priority-management-controls,
+  .assignment-management-controls {
+    grid-template-columns: 1fr;
+  }
 }
 
 .ticket-history h4 {

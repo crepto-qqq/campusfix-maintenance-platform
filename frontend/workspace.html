@@ -76,8 +76,13 @@
       </section>
 
       <section id="all-requests-section" class="card" hidden>
-        <h2>All Maintenance Requests</h2>
-        <p>Read-only overview of requests submitted by all users.</p>
+        <h2 id="all-requests-title">All Maintenance Requests</h2>
+        <p id="all-requests-description">Overview of requests submitted by all users.</p>
+        <section id="priority-summary" class="priority-summary" aria-labelledby="priority-summary-title" hidden>
+          <h3 id="priority-summary-title">Priority Distribution</h3>
+          <div id="priority-summary-values" class="priority-summary-values"></div>
+          <p id="priority-summary-message" role="status"></p>
+        </section>
         <div id="all-tickets-list" class="tickets-list">
           <p id="all-tickets-message" role="status">Loading requests...</p>
         </div>

@@ -18,6 +18,12 @@ erDiagram
     APP_USERS ||--o{ TICKET_HISTORY : performs
     TICKETS ||--o{ TICKET_HISTORY : records
     TICKETS ||--o{ TICKET_IMAGES : contains
+    TICKETS ||--o{ TICKET_ASSIGNMENTS : has
+    APP_USERS ||--o{ TICKET_ASSIGNMENTS : technician
+    APP_USERS ||--o{ TICKET_ASSIGNMENTS : assigns
+    TICKETS ||--o{ IN_APP_NOTIFICATIONS : relates_to
+    APP_USERS ||--o{ IN_APP_NOTIFICATIONS : receives
+    APP_USERS ||--o{ IN_APP_NOTIFICATIONS : triggers
 
     APP_USERS {
         bigint id PK
@@ -68,6 +74,8 @@ erDiagram
         bigint id PK
         bigint submitted_by FK
         varchar title
+        enum urgency
+        enum operational_priority
         enum status
         timestamp created_at
         timestamp updated_at
@@ -80,6 +88,29 @@ erDiagram
         enum event_type
         timestamp occurred_at
     }
+
+    TICKET_ASSIGNMENTS {
+        bigint id PK
+        bigint ticket_id FK
+        bigint technician_id FK
+        bigint assigned_by FK
+        timestamp assigned_at
+        timestamp ended_at
+        boolean is_active
+        varchar reason
+    }
+
+    IN_APP_NOTIFICATIONS {
+        bigint id PK
+        bigint recipient_id FK
+        bigint actor_id FK
+        bigint ticket_id FK
+        enum type
+        varchar message
+        varchar deduplication_key UK
+        timestamp created_at
+        timestamp read_at
+    }
 ```
 
 ## Responsibilities
@@ -91,6 +122,8 @@ erDiagram
 | `campus_identities` | Student/Staff identity and verification information |
 | `system_roles` | Authorisation role catalogue |
 | `user_role_assignments` | Current and historical role allocation, including administrator and time |
+| `ticket_assignments` | Current and historical Technician allocation, including assigning Administrator and time |
+| `in_app_notifications` | Durable, deduplicated business events for the future F17 notification centre |
 
 ## Compatibility and Data Integrity
 
@@ -100,6 +133,8 @@ erDiagram
 - Only one active role is allowed by the service layer, while previous assignments remain available as audit data.
 - Existing plaintext passwords are converted to BCrypt hashes during migration.
 - Profile, Avatar, Request and History APIs retain their existing request and response contracts.
+- `tickets.operational_priority`独立于Requester填写的`urgency`，允许`NULL`表示尚未由Administrator分级，并建立`idx_tickets_operational_priority`索引。
+- 初次分派使用独立`ticket_assignments`关系表；工单状态、Assignment、History和Notification在同一事务中保存。
 
 ## Legacy Migration
 

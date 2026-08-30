@@ -275,6 +275,10 @@ public class DataInitializer implements CommandLineRunner {
 
     private void migrateTicketStatuses() {
         jdbcTemplate.execute("""
+                ALTER TABLE tickets ALTER COLUMN operational_priority
+                ENUM('LOW', 'MEDIUM', 'HIGH', 'CRITICAL')
+                """);
+        jdbcTemplate.execute("""
                 ALTER TABLE tickets ALTER COLUMN status
                 ENUM(
                     'SUBMITTED',
@@ -293,7 +297,7 @@ public class DataInitializer implements CommandLineRunner {
 
     private void backfillTicketHistory() {
         for (Ticket ticket : ticketRepository.findAll()) {
-            if (!ticketHistoryRepository.existsByTicketId(ticket.getId())) {
+            if (!ticketHistoryRepository.existsByTicket_Id(ticket.getId())) {
                 ticketHistoryRepository.save(new TicketHistory(
                         ticket,
                         TicketEventType.LEGACY_IMPORTED,

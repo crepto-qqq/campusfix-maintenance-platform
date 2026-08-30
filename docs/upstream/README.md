@@ -99,6 +99,8 @@ Open `frontend/index.html` directly in a browser, or use the VS Code Live Server
 
 The authentication account, user profile, campus identity and role assignments are stored in normalized relational tables. See [Database ERD and user normalization](docs/Database-ERD-User-Normalization.md).
 
+Implemented workflow documentation: [F11 priority classification](docs/F11-Priority-Classification-CN.md) and [F12 ticket assignment](docs/F12-Ticket-Assignment-CN.md).
+
 The Gradle `bootRun` task and VS Code both use the repository-level `data/campusfix` H2 database. Existing legacy user data is migrated automatically on first startup.
 
 ## Team Members and Responsibilities

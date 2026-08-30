@@ -20,14 +20,21 @@ const ticketMessage = document.getElementById('ticket-message');
 const ticketsList = document.getElementById('tickets-list');
 const ticketsMessage = document.getElementById('tickets-message');
 const allRequestsSection = document.getElementById('all-requests-section');
+const allRequestsTitle = document.getElementById('all-requests-title');
 const allTicketsList = document.getElementById('all-tickets-list');
 const allTicketsMessage = document.getElementById('all-tickets-message');
+const allRequestsDescription = document.getElementById('all-requests-description');
+const prioritySummary = document.getElementById('priority-summary');
+const prioritySummaryValues = document.getElementById('priority-summary-values');
+const prioritySummaryMessage = document.getElementById('priority-summary-message');
 const profileForm = document.getElementById('profile-form');
 const avatarForm = document.getElementById('avatar-form');
 const profileAvatar = document.getElementById('profile-avatar');
 const adminPage = document.getElementById('admin-page');
 const adminUsersBody = document.getElementById('admin-users-body');
 const adminMessage = document.getElementById('admin-message');
+let currentWorkspaceRole = null;
+let availableTechnicians = [];
 
 if (registrationForm) {
   registrationForm.addEventListener('submit', async (event) => {
@@ -118,6 +125,7 @@ async function initWorkspace() {
   }
 
   displayWorkspaceRole(user);
+  currentWorkspaceRole = user.role;
 
   if (user.role === 'GENERAL_USER') {
     loadTickets();
@@ -134,15 +142,31 @@ async function initWorkspace() {
   roleMessage.hidden = false;
   roleTitle.textContent = `${formatRole(user.role)} Workspace`;
   const descriptions = {
-    MAINTENANCE_STAFF: 'Your account has Maintenance Staff access. Assigned-ticket tools will appear here when the assignment workflow is delivered.',
-    ADMINISTRATOR: 'Review all maintenance requests below, or use Manage Users to maintain university identities and operational roles.',
+    MAINTENANCE_STAFF: 'Review the maintenance requests currently assigned to you.',
+    ADMINISTRATOR: 'Review requests, set operational priorities, assign technicians, or use Manage Users to maintain access.',
     MANAGER: 'Review all maintenance requests below. Management reporting tools will appear here when the reporting workflow is delivered.'
   };
   roleDescription.textContent = descriptions[user.role] ?? '';
 
-  if (user.role === 'ADMINISTRATOR' || user.role === 'MANAGER') {
+  if (user.role === 'ADMINISTRATOR' || user.role === 'MANAGER' || user.role === 'MAINTENANCE_STAFF') {
     allRequestsSection.hidden = false;
+    allRequestsTitle.textContent = user.role === 'MAINTENANCE_STAFF'
+      ? 'My Assigned Requests'
+      : 'All Maintenance Requests';
+    const descriptionsByRole = {
+      ADMINISTRATOR: 'Review all requests, set priority, and assign submitted work to a technician.',
+      MANAGER: 'Read-only overview of requests submitted by all users.',
+      MAINTENANCE_STAFF: 'Only requests actively assigned to your account are shown.'
+    };
+    allRequestsDescription.textContent = descriptionsByRole[user.role];
+
+    if (user.role === 'ADMINISTRATOR') {
+      await loadAssignableTechnicians();
+    }
     await loadAllTickets();
+    if (user.role === 'ADMINISTRATOR' || user.role === 'MANAGER') {
+      await loadPrioritySummary();
+    }
   }
 }
 
@@ -256,7 +280,9 @@ function renderTickets(tickets) {
 
 function renderAllTickets(tickets) {
   if (!tickets || tickets.length === 0) {
-    allTicketsMessage.textContent = 'No maintenance requests have been submitted yet.';
+    allTicketsMessage.textContent = currentWorkspaceRole === 'MAINTENANCE_STAFF'
+      ? 'No maintenance requests are currently assigned to you.'
+      : 'No maintenance requests have been submitted yet.';
     allTicketsList.innerHTML = '';
     return;
   }
@@ -265,11 +291,21 @@ function renderAllTickets(tickets) {
   allTicketsList.innerHTML = '';
 
   tickets.forEach((ticket) => {
-    allTicketsList.appendChild(renderTicket(ticket, true));
+    allTicketsList.appendChild(renderTicket(
+      ticket,
+      true,
+      currentWorkspaceRole === 'ADMINISTRATOR',
+      currentWorkspaceRole === 'ADMINISTRATOR'
+    ));
   });
 }
 
-function renderTicket(ticket, readOnly = false) {
+function renderTicket(
+  ticket,
+  readOnly = false,
+  canManagePriority = false,
+  canAssignTicket = false
+) {
   const article = document.createElement('article');
   article.className = 'ticket-card';
   article.dataset.ticketId = ticket.id;
@@ -287,7 +323,20 @@ function renderTicket(ticket, readOnly = false) {
       &middot;
       <span>${escapeHtml(ticket.location)}</span>
       &middot;
-      <span class="urgency-${ticket.urgency.toLowerCase()}">${formatUrgency(ticket.urgency)}</span>
+      <span class="urgency-${ticket.urgency.toLowerCase()}">Suggested urgency: ${formatUrgency(ticket.urgency)}</span>
+    </p>
+    <p class="ticket-priority">
+      <strong>Operational priority:</strong>
+      <span class="${ticket.operationalPriority ? `priority-${ticket.operationalPriority.toLowerCase()}` : 'priority-unset'}">
+        ${formatPriority(ticket.operationalPriority)}
+      </span>
+    </p>
+    <p class="ticket-assignment">
+      <strong>Assigned technician:</strong>
+      ${ticket.assignedTechnicianId
+        ? `${escapeHtml(ticket.assignedTechnicianName)} (${escapeHtml(ticket.assignedTechnicianEmail)})`
+        : '<span class="assignment-unassigned">Unassigned</span>'}
+      ${ticket.assignedAt ? `<span class="assignment-time">Assigned: ${formatDate(ticket.assignedAt)}</span>` : ''}
     </p>
     ${readOnly ? `<p class="ticket-dates"><strong>Submitted by:</strong> ${escapeHtml(ticket.submittedByName)} (${escapeHtml(ticket.submittedByEmail)})</p>` : ''}
     <p class="ticket-description">${escapeHtml(ticket.description)}</p>
@@ -299,6 +348,38 @@ function renderTicket(ticket, readOnly = false) {
       <button type="button" class="ticket-history-button" data-ticket-id="${ticket.id}">View History</button>
     </div>
     <div class="ticket-history" data-ticket-id="${ticket.id}" hidden></div>
+    ${canManagePriority ? `
+      <div class="priority-management">
+        <label for="priority-${ticket.id}">Set Operational Priority</label>
+        <div class="priority-management-controls">
+          <select id="priority-${ticket.id}" class="ticket-priority-select">
+            <option value="">Select priority</option>
+            ${createPriorityOptions(ticket.operationalPriority)}
+          </select>
+          <input
+            class="ticket-priority-reason"
+            type="text"
+            maxlength="1000"
+            placeholder="Reason (optional)"
+            aria-label="Priority reason for ${escapeHtml(ticket.title)}">
+          <button type="button" class="ticket-priority-save">Save Priority</button>
+        </div>
+        <p class="ticket-priority-message" role="status"></p>
+      </div>
+    ` : ''}
+    ${canAssignTicket && ticket.status === 'SUBMITTED' && !ticket.assignedTechnicianId ? `
+      <div class="assignment-management">
+        <label for="technician-${ticket.id}">Assign Technician</label>
+        <div class="assignment-management-controls">
+          <select id="technician-${ticket.id}" class="ticket-technician-select">
+            <option value="">Select active Maintenance Staff</option>
+            ${createTechnicianOptions()}
+          </select>
+          <button type="button" class="ticket-assignment-save">Assign Request</button>
+        </div>
+        <p class="ticket-assignment-message" role="status"></p>
+      </div>
+    ` : ''}
   `;
 
   article.querySelectorAll('.ticket-edit-button').forEach((button) => {
@@ -317,9 +398,173 @@ function renderTicket(ticket, readOnly = false) {
     ));
   });
 
+  const prioritySaveButton = article.querySelector('.ticket-priority-save');
+  if (prioritySaveButton) {
+    prioritySaveButton.addEventListener('click', () => updateTicketPriority(
+      ticket.id,
+      article.querySelector('.ticket-priority-select'),
+      article.querySelector('.ticket-priority-reason'),
+      article.querySelector('.ticket-priority-message'),
+      prioritySaveButton
+    ));
+  }
+
+  const assignmentSaveButton = article.querySelector('.ticket-assignment-save');
+  if (assignmentSaveButton) {
+    assignmentSaveButton.addEventListener('click', () => assignTicket(
+      ticket.id,
+      article.querySelector('.ticket-technician-select'),
+      article.querySelector('.ticket-assignment-message'),
+      assignmentSaveButton
+    ));
+  }
+
   loadTicketImages(ticket.id, ticket.imageIds, article.querySelector('.ticket-images'));
 
   return article;
+}
+
+function createTechnicianOptions() {
+  return availableTechnicians.map((technician) => `
+    <option value="${technician.id}">
+      ${escapeHtml(technician.name)} (${escapeHtml(technician.email)})
+    </option>
+  `).join('');
+}
+
+async function assignTicket(ticketId, select, message, button) {
+  if (!select.value) {
+    message.textContent = 'Please select an active Maintenance Staff member.';
+    return;
+  }
+
+  message.textContent = 'Assigning request...';
+  button.disabled = true;
+
+  try {
+    const response = await fetch(`${API_BASE_URL}/tickets/${ticketId}/assignment`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
+      body: JSON.stringify({ technicianId: Number(select.value) })
+    });
+
+    if (response.status === 401) {
+      window.location.href = './index.html';
+      return;
+    }
+    if (!response.ok) {
+      const data = await response.json().catch(() => null);
+      throw new Error(data?.message ?? `Assignment failed (${response.status}).`);
+    }
+
+    await loadAllTickets();
+    allTicketsMessage.textContent = 'Request assigned successfully.';
+  } catch (error) {
+    message.textContent = error.message;
+    button.disabled = false;
+  }
+}
+
+function createPriorityOptions(selectedPriority) {
+  return ['LOW', 'MEDIUM', 'HIGH', 'CRITICAL'].map((priority) => `
+    <option value="${priority}" ${priority === selectedPriority ? 'selected' : ''}>
+      ${formatPriority(priority)}
+    </option>
+  `).join('');
+}
+
+async function updateTicketPriority(ticketId, select, reasonInput, message, button) {
+  if (!select.value) {
+    message.textContent = 'Please select an operational priority.';
+    return;
+  }
+
+  message.textContent = 'Saving priority...';
+  button.disabled = true;
+
+  try {
+    const response = await fetch(`${API_BASE_URL}/tickets/${ticketId}/priority`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
+      body: JSON.stringify({
+        priority: select.value,
+        reason: reasonInput.value.trim() || null
+      })
+    });
+
+    if (response.status === 401) {
+      window.location.href = './index.html';
+      return;
+    }
+
+    if (!response.ok) {
+      const data = await response.json().catch(() => null);
+      throw new Error(data?.message ?? `Priority update failed (${response.status}).`);
+    }
+
+    await loadAllTickets();
+    await loadPrioritySummary();
+    allTicketsMessage.textContent = 'Operational priority updated.';
+  } catch (error) {
+    message.textContent = error.message;
+    button.disabled = false;
+  }
+}
+
+async function loadAssignableTechnicians() {
+  const response = await fetch(`${API_BASE_URL}/tickets/technicians`, {
+    credentials: 'include'
+  });
+
+  if (response.status === 401) {
+    window.location.href = './index.html';
+    return;
+  }
+  if (!response.ok) {
+    throw new Error(`Loading technicians failed (${response.status}).`);
+  }
+
+  availableTechnicians = await response.json();
+}
+
+async function loadPrioritySummary() {
+  prioritySummary.hidden = false;
+  prioritySummaryMessage.textContent = 'Loading priority distribution...';
+
+  try {
+    const response = await fetch(`${API_BASE_URL}/tickets/priority-summary`, {
+      credentials: 'include'
+    });
+
+    if (response.status === 401) {
+      window.location.href = './index.html';
+      return;
+    }
+
+    if (!response.ok) {
+      throw new Error(`Loading priority distribution failed (${response.status}).`);
+    }
+
+    const summary = await response.json();
+    prioritySummaryValues.innerHTML = [
+      ['Unclassified', summary.unclassified, 'priority-unset'],
+      ['Low', summary.low, 'priority-low'],
+      ['Medium', summary.medium, 'priority-medium'],
+      ['High', summary.high, 'priority-high'],
+      ['Critical', summary.critical, 'priority-critical']
+    ].map(([label, count, className]) => `
+      <div class="priority-summary-item">
+        <span class="${className}">${label}</span>
+        <strong>${count}</strong>
+      </div>
+    `).join('');
+    prioritySummaryMessage.textContent = '';
+  } catch (error) {
+    prioritySummaryValues.innerHTML = '';
+    prioritySummaryMessage.textContent = error.message;
+  }
 }
 
 async function toggleTicketHistory(ticketId, container, button) {
@@ -627,6 +872,16 @@ function formatUrgency(urgency) {
     EMERGENCY: 'Emergency'
   };
   return labels[urgency] ?? urgency;
+}
+
+function formatPriority(priority) {
+  const labels = {
+    LOW: 'Low',
+    MEDIUM: 'Medium',
+    HIGH: 'High',
+    CRITICAL: 'Critical'
+  };
+  return labels[priority] ?? 'Not set';
 }
 
 function formatDate(value) {

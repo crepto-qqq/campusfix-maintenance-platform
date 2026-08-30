@@ -77,6 +77,10 @@ public class TicketHistory {
         return id;
     }
 
+    public Long getTicketId() {
+        return ticket.getId();
+    }
+
     public TicketEventType getEventType() {
         return eventType;
     }
