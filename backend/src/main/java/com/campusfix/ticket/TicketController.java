@@ -124,6 +124,18 @@ public class TicketController {
                 administrator));
     }
 
+    @PutMapping("/{ticketId}/status")
+    public TicketResponse updateStatus(
+            @PathVariable("ticketId") Long ticketId,
+            @Valid @RequestBody TicketStatusUpdateRequest request,
+            HttpSession session) {
+        User technician = accessControlService.requireRole(session, Role.MAINTENANCE_STAFF);
+        return createTicketResponse(ticketService.updateTicketStatus(
+                ticketId,
+                request.status(),
+                technician));
+    }
+
     @PutMapping("/{ticketId}")
     public TicketResponse updateTicket(
             @PathVariable("ticketId") Long ticketId,

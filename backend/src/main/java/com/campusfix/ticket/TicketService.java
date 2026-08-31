@@ -238,6 +238,54 @@ public class TicketService {
     }
 
     @Transactional
+    public Ticket updateTicketStatus(Long ticketId, TicketStatus newStatus, User technician) {
+        if (technician.getRole() != Role.MAINTENANCE_STAFF) {
+            throw new ResponseStatusException(
+                    HttpStatus.FORBIDDEN,
+                    "Only assigned maintenance staff can update request status");
+        }
+
+        Ticket ticket = findTicket(ticketId);
+        TicketAssignment assignment = ticket.getActiveAssignment();
+        if (assignment == null || !assignment.getTechnician().getId().equals(technician.getId())) {
+            throw new ResponseStatusException(
+                    HttpStatus.FORBIDDEN,
+                    "Only the assigned technician can update this request status");
+        }
+
+        TicketStatus previousStatus = ticket.getStatus();
+        if (!isAllowedTechnicianStatusTransition(previousStatus, newStatus)) {
+            throw new ResponseStatusException(
+                    HttpStatus.CONFLICT,
+                    "Invalid status transition from " + previousStatus + " to " + newStatus);
+        }
+
+        ticket.setStatus(newStatus);
+        ticket.touch();
+        Ticket saved = ticketRepository.save(ticket);
+        recordHistory(
+                saved,
+                TicketEventType.STATUS_CHANGED,
+                technician,
+                previousStatus.name(),
+                newStatus.name(),
+                null);
+
+        NotificationType notificationType = newStatus == TicketStatus.COMPLETED
+                ? NotificationType.TICKET_COMPLETED
+                : NotificationType.STATUS_CHANGED;
+        notificationRepository.save(new InAppNotification(
+                saved.getSubmittedBy(),
+                technician,
+                saved,
+                notificationType,
+                "Maintenance request #" + saved.getId()
+                        + " status changed to " + newStatus,
+                notificationType.name() + ":" + saved.getId() + ":" + newStatus));
+        return saved;
+    }
+
+    @Transactional
     public Ticket updateTicket(Long ticketId, Long userId, TicketRequest request) {
         Ticket ticket = getTicketOwnedByUser(ticketId, userId);
 
@@ -405,6 +453,13 @@ public class TicketService {
     private boolean isAssignableTechnician(User user) {
         return user.getAccountStatus() == AccountStatus.ACTIVE
                 && user.getRole() == Role.MAINTENANCE_STAFF;
+    }
+
+    private boolean isAllowedTechnicianStatusTransition(
+            TicketStatus previousStatus,
+            TicketStatus newStatus) {
+        return (previousStatus == TicketStatus.ASSIGNED && newStatus == TicketStatus.IN_PROGRESS)
+                || (previousStatus == TicketStatus.IN_PROGRESS && newStatus == TicketStatus.COMPLETED);
     }
 
     private void requireAdministrator(User user) {
