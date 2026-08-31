@@ -459,6 +459,21 @@ button {
   margin: 8px 0 0;
 }
 
+.status-management {
+  margin-top: 16px;
+  padding-top: 16px;
+  border-top: 1px solid #ddd;
+}
+
+.ticket-status-save {
+  white-space: nowrap;
+}
+
+.ticket-status-message {
+  min-height: 20px;
+  margin: 8px 0 0;
+}
+
 .priority-summary {
   margin: 16px 0 20px;
   padding: 16px;

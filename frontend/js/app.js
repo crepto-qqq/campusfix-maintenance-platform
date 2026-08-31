@@ -295,7 +295,8 @@ function renderAllTickets(tickets) {
       ticket,
       true,
       currentWorkspaceRole === 'ADMINISTRATOR',
-      currentWorkspaceRole === 'ADMINISTRATOR'
+      currentWorkspaceRole === 'ADMINISTRATOR',
+      currentWorkspaceRole === 'MAINTENANCE_STAFF'
     ));
   });
 }
@@ -304,7 +305,8 @@ function renderTicket(
   ticket,
   readOnly = false,
   canManagePriority = false,
-  canAssignTicket = false
+  canAssignTicket = false,
+  canUpdateStatus = false
 ) {
   const article = document.createElement('article');
   article.className = 'ticket-card';
@@ -380,6 +382,17 @@ function renderTicket(
         <p class="ticket-assignment-message" role="status"></p>
       </div>
     ` : ''}
+    ${canUpdateStatus && ['ASSIGNED', 'IN_PROGRESS'].includes(ticket.status) ? `
+      <div class="status-management">
+        <button
+          type="button"
+          class="ticket-status-save"
+          data-next-status="${ticket.status === 'ASSIGNED' ? 'IN_PROGRESS' : 'COMPLETED'}">
+          ${ticket.status === 'ASSIGNED' ? 'Start Progress' : 'Mark Completed'}
+        </button>
+        <p class="ticket-status-message" role="status"></p>
+      </div>
+    ` : ''}
   `;
 
   article.querySelectorAll('.ticket-edit-button').forEach((button) => {
@@ -416,6 +429,16 @@ function renderTicket(
       article.querySelector('.ticket-technician-select'),
       article.querySelector('.ticket-assignment-message'),
       assignmentSaveButton
+    ));
+  }
+
+  const statusSaveButton = article.querySelector('.ticket-status-save');
+  if (statusSaveButton) {
+    statusSaveButton.addEventListener('click', () => updateTicketStatus(
+      ticket.id,
+      statusSaveButton.dataset.nextStatus,
+      article.querySelector('.ticket-status-message'),
+      statusSaveButton
     ));
   }
 
@@ -507,6 +530,36 @@ async function updateTicketPriority(ticketId, select, reasonInput, message, butt
     await loadAllTickets();
     await loadPrioritySummary();
     allTicketsMessage.textContent = 'Operational priority updated.';
+  } catch (error) {
+    message.textContent = error.message;
+    button.disabled = false;
+  }
+}
+
+async function updateTicketStatus(ticketId, status, message, button) {
+  message.textContent = 'Updating status...';
+  button.disabled = true;
+
+  try {
+    const response = await fetch(`${API_BASE_URL}/tickets/${ticketId}/status`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
+      body: JSON.stringify({ status })
+    });
+
+    if (response.status === 401) {
+      window.location.href = './index.html';
+      return;
+    }
+
+    if (!response.ok) {
+      const data = await response.json().catch(() => null);
+      throw new Error(data?.message ?? `Status update failed (${response.status}).`);
+    }
+
+    await loadAllTickets();
+    allTicketsMessage.textContent = 'Request status updated.';
   } catch (error) {
     message.textContent = error.message;
     button.disabled = false;
