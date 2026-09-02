@@ -21,7 +21,8 @@ import org.springframework.boot.test.web.server.LocalServerPort;
         webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT,
         properties = {
             "spring.datasource.url=jdbc:h2:mem:f11-priority;DB_CLOSE_DELAY=-1",
-            "spring.jpa.hibernate.ddl-auto=create-drop"
+            "spring.jpa.hibernate.ddl-auto=create-drop",
+            "campusfix.bootstrap-admin.password=integration-test-admin-password"
         })
 class F11PriorityIntegrationTest {
 
@@ -76,7 +77,7 @@ class F11PriorityIntegrationTest {
                 "/api/tickets/" + ticketId + "/priority",
                 "{\"priority\":\"LOW\"}").statusCode());
 
-        HttpClient adminClient = login("admin@campusfix.edu", "admin12345");
+        HttpClient adminClient = login("admin@campusfix.edu", "integration-test-admin-password");
         String unclassifiedSummary = get(adminClient, "/api/tickets/priority-summary").body();
         assertTrue(unclassifiedSummary.contains("\"unclassified\":1"));
         assertTrue(unclassifiedSummary.contains("\"high\":0"));

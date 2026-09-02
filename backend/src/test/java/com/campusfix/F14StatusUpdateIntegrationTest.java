@@ -20,7 +20,8 @@ import org.springframework.boot.test.web.server.LocalServerPort;
         webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT,
         properties = {
             "spring.datasource.url=jdbc:h2:mem:f14-status-update;DB_CLOSE_DELAY=-1",
-            "spring.jpa.hibernate.ddl-auto=create-drop"
+            "spring.jpa.hibernate.ddl-auto=create-drop",
+            "campusfix.bootstrap-admin.password=integration-test-admin-password"
         })
 class F14StatusUpdateIntegrationTest {
 
@@ -39,7 +40,7 @@ class F14StatusUpdateIntegrationTest {
         HttpClient requesterClient = login("f14.requester@test.local", "password123");
         long ticketId = createTicket(requesterClient, "F14 status target");
 
-        HttpClient adminClient = login("admin@campusfix.edu", "admin12345");
+        HttpClient adminClient = login("admin@campusfix.edu", "integration-test-admin-password");
         updateAccess(adminClient, technicianId, "CAMPUS_STAFF", "MAINTENANCE_STAFF");
         updateAccess(adminClient, otherTechnicianId, "CAMPUS_STAFF", "MAINTENANCE_STAFF");
         assertEquals(200, post(

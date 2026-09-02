@@ -19,6 +19,7 @@ import com.campusfix.user.User;
 import com.campusfix.user.UserRepository;
 
 import org.springframework.boot.CommandLineRunner;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Component;
@@ -29,7 +30,6 @@ public class DataInitializer implements CommandLineRunner {
 
     private static final String ADMIN_NAME = "Administrator";
     private static final String ADMIN_EMAIL = "admin@campusfix.edu";
-    private static final String ADMIN_PASSWORD = "admin12345";
 
     private final UserRepository userRepository;
     private final SystemRoleRepository systemRoleRepository;
@@ -37,6 +37,7 @@ public class DataInitializer implements CommandLineRunner {
     private final TicketHistoryRepository ticketHistoryRepository;
     private final JdbcTemplate jdbcTemplate;
     private final PasswordEncoder passwordEncoder;
+    private final String bootstrapAdminPassword;
 
     public DataInitializer(
             UserRepository userRepository,
@@ -44,13 +45,15 @@ public class DataInitializer implements CommandLineRunner {
             TicketRepository ticketRepository,
             TicketHistoryRepository ticketHistoryRepository,
             JdbcTemplate jdbcTemplate,
-            PasswordEncoder passwordEncoder) {
+            PasswordEncoder passwordEncoder,
+            @Value("${campusfix.bootstrap-admin.password:}") String bootstrapAdminPassword) {
         this.userRepository = userRepository;
         this.systemRoleRepository = systemRoleRepository;
         this.ticketRepository = ticketRepository;
         this.ticketHistoryRepository = ticketHistoryRepository;
         this.jdbcTemplate = jdbcTemplate;
         this.passwordEncoder = passwordEncoder;
+        this.bootstrapAdminPassword = bootstrapAdminPassword;
     }
 
     @Override
@@ -260,17 +263,26 @@ public class DataInitializer implements CommandLineRunner {
         SystemRole administratorRole = systemRoleRepository.findByCode(Role.ADMINISTRATOR)
                 .orElseThrow();
         User administrator = userRepository.findByEmailIgnoreCase(ADMIN_EMAIL)
-                .orElseGet(() -> new User(
-                        ADMIN_NAME,
-                        ADMIN_EMAIL,
-                        passwordEncoder.encode(ADMIN_PASSWORD),
-                        IdentityType.CAMPUS_STAFF));
+                .orElseGet(() -> createAdministrator());
 
         if (administrator.getIdentityType() != IdentityType.CAMPUS_STAFF) {
             administrator.changeIdentityType(IdentityType.CAMPUS_STAFF, administrator);
         }
         administrator.assignRole(administratorRole, administrator.getId() == null ? null : administrator);
         userRepository.save(administrator);
+    }
+
+    private User createAdministrator() {
+        if (bootstrapAdminPassword == null || bootstrapAdminPassword.isBlank()) {
+            throw new IllegalStateException(
+                    "CAMPUSFIX_ADMIN_PASSWORD must be set before creating the initial administrator");
+        }
+
+        return new User(
+                ADMIN_NAME,
+                ADMIN_EMAIL,
+                passwordEncoder.encode(bootstrapAdminPassword),
+                IdentityType.CAMPUS_STAFF);
     }
 
     private void migrateTicketStatuses() {

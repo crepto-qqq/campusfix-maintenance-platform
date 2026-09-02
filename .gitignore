@@ -1,8 +1,12 @@
-# Compiled class file
+# Java / Gradle build output
 *.class
+backend/bin/
+backend/.gradle/
+backend/build/
 
-# Log file
+# Logs and crash dumps
 *.log
+*.trace.db
 
 # BlueJ files
 *.ctxt
@@ -24,12 +28,48 @@
 hs_err_pid*
 replay_pid*
 
-# Development files
+# IDE and local development files
 .idea/
 .vscode/
-.env
-backend/.gradle/
-backend/build/
-backend/data/
-data/backups/
 frontend/node_modules/
+
+# Environment variables and local secret configuration
+.env
+.env.*
+!.env.example
+**/.env
+**/.env.*
+!**/.env.example
+**/application-local.properties
+**/application-secrets.properties
+**/application-*.local.properties
+secrets/
+credentials/
+**/secrets/
+**/credentials/
+
+# API, OAuth and service-account credentials
+client_secret*.json
+service-account*.json
+*credentials*.json
+
+# Private keys, certificates and Java keystores
+*.pem
+*.key
+*.p12
+*.pfx
+*.jks
+*.keystore
+
+# Local account notes
+docs/local-admin-account.txt
+
+# Local databases and user-generated runtime data
+*.mv.db
+*.h2.db
+*.sqlite
+*.sqlite3
+/data/**
+!/data/.gitkeep
+/backend/data/
+/frontend/data/

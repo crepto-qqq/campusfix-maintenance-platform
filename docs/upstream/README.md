@@ -91,6 +91,15 @@ cd backend
 
 On Windows, use `.\gradlew.bat bootRun` for the back-end command.
 
+Before the first start of a new local database, set a local administrator
+password through the environment. Never put the real value in Git-tracked
+configuration:
+
+```powershell
+$env:CAMPUSFIX_ADMIN_PASSWORD='use-a-strong-local-password'
+.\gradlew.bat bootRun
+```
+
 ### Open the front-end
 
 Open `frontend/index.html` directly in a browser, or use the VS Code Live Server extension.
@@ -101,7 +110,12 @@ The authentication account, user profile, campus identity and role assignments a
 
 Implemented workflow documentation: [F11 priority classification](docs/F11-Priority-Classification-CN.md) and [F12 ticket assignment](docs/F12-Ticket-Assignment-CN.md).
 
-The Gradle `bootRun` task and VS Code both use the repository-level `data/campusfix` H2 database. Existing legacy user data is migrated automatically on first startup.
+The application resolves the repository location at startup and always uses the
+repository-level `data/campusfix` H2 database. Its location does not change when
+the back-end is launched from the repository, `backend`, or `frontend`
+directory. The configuration intentionally has no relative-path fallback, so a
+stale launch cannot silently create another database. Existing legacy user data
+is migrated automatically on first startup.
 
 ## Team Members and Responsibilities
 

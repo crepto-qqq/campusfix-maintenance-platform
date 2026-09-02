@@ -31,7 +31,8 @@ import com.campusfix.ticket.TicketAssignmentRepository;
         webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT,
         properties = {
             "spring.datasource.url=jdbc:h2:mem:f12-assignment;DB_CLOSE_DELAY=-1",
-            "spring.jpa.hibernate.ddl-auto=create-drop"
+            "spring.jpa.hibernate.ddl-auto=create-drop",
+            "campusfix.bootstrap-admin.password=integration-test-admin-password"
         })
 class F12AssignmentIntegrationTest {
 
@@ -69,7 +70,7 @@ class F12AssignmentIntegrationTest {
         long closedTicketId = createTicket(requesterClient, "F12 closed target");
         jdbcTemplate.update("UPDATE tickets SET status = 'CLOSED' WHERE id = ?", closedTicketId);
 
-        HttpClient adminClient = login("admin@campusfix.edu", "admin12345");
+        HttpClient adminClient = login("admin@campusfix.edu", "integration-test-admin-password");
         updateAccess(adminClient, technicianId, "CAMPUS_STAFF", "MAINTENANCE_STAFF");
         updateAccess(adminClient, otherTechnicianId, "CAMPUS_STAFF", "MAINTENANCE_STAFF");
         updateAccess(adminClient, disabledTechnicianId, "CAMPUS_STAFF", "MAINTENANCE_STAFF");

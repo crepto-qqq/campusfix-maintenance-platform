@@ -21,7 +21,8 @@ import org.springframework.boot.test.web.server.LocalServerPort;
         webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT,
         properties = {
             "spring.datasource.url=jdbc:h2:mem:normalized-user-flow;DB_CLOSE_DELAY=-1",
-            "spring.jpa.hibernate.ddl-auto=create-drop"
+            "spring.jpa.hibernate.ddl-auto=create-drop",
+            "campusfix.bootstrap-admin.password=integration-test-admin-password"
         })
 class NormalizedUserFlowIntegrationTest {
 
@@ -83,7 +84,7 @@ class NormalizedUserFlowIntegrationTest {
                 adminClient,
                 "/api/auth/login",
                 """
-                {"email":"admin@campusfix.edu","password":"admin12345"}
+                {"email":"admin@campusfix.edu","password":"integration-test-admin-password"}
                 """).statusCode());
 
         HttpResponse<String> accessUpdate = put(

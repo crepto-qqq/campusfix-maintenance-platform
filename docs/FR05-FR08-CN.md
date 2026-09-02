@@ -185,7 +185,7 @@
 
 | 邮箱 | 密码 |
 |---|---|
-| admin@campusfix.edu | admin12345 |
+| admin@campusfix.edu | 使用本机环境变量 `CAMPUSFIX_ADMIN_PASSWORD` 设置的值 |
 
 > 如果数据库是由旧版本应用创建的，删除 `backend/data` 后重启，以便创建新的 `role` 列。
 
@@ -199,7 +199,7 @@
 | 4 | 查看工作台右上角 | 显示蓝色 `General User` 徽章 |
 | 5 | 打开个人资料页 | 显示 `Role: General User` |
 | 6 | 退出登录 | 返回登录页 |
-| 7 | 用 `admin@campusfix.edu` / `admin12345` 登录 | 显示红色 `Administrator` 徽章 |
+| 7 | 用 `admin@campusfix.edu` / 本机设置的管理员密码登录 | 显示红色 `Administrator` 徽章 |
 
 ### 7.3 提交请求（FR05）
 
