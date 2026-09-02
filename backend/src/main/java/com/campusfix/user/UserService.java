@@ -3,11 +3,15 @@ package com.campusfix.user;
 import java.util.List;
 import java.util.Locale;
 
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
+
+import com.campusfix.auth.EmailVerificationService;
+import com.campusfix.auth.EmailVerificationService.VerificationResult;
 
 @Service
 public class UserService {
@@ -16,24 +20,42 @@ public class UserService {
     private final SystemRoleRepository systemRoleRepository;
     private final UserRoleAssignmentRepository roleAssignmentRepository;
     private final PasswordEncoder passwordEncoder;
+    private final EmailVerificationService emailVerificationService;
+    private final boolean emailVerificationRequired;
 
     public UserService(
             UserRepository userRepository,
             SystemRoleRepository systemRoleRepository,
             UserRoleAssignmentRepository roleAssignmentRepository,
-            PasswordEncoder passwordEncoder) {
+            PasswordEncoder passwordEncoder,
+            EmailVerificationService emailVerificationService,
+            @Value("${campusfix.registration.email-verification.required:true}") boolean emailVerificationRequired) {
         this.userRepository = userRepository;
         this.systemRoleRepository = systemRoleRepository;
         this.roleAssignmentRepository = roleAssignmentRepository;
         this.passwordEncoder = passwordEncoder;
+        this.emailVerificationService = emailVerificationService;
+        this.emailVerificationRequired = emailVerificationRequired;
     }
 
     @Transactional
-    public User register(String name, String email, String password, IdentityType identityType) {
+    public User register(
+            String name,
+            String email,
+            String password,
+            IdentityType identityType,
+            String verificationCode) {
         String normalizedEmail = email.trim().toLowerCase(Locale.ROOT);
 
         if (userRepository.existsByEmailIgnoreCase(normalizedEmail)) {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "Email is already registered");
+        }
+
+        if (emailVerificationRequired) {
+            VerificationResult verificationResult = emailVerificationService.verifyCode(
+                    normalizedEmail,
+                    verificationCode);
+            rejectInvalidVerificationCode(verificationResult);
         }
 
         User user = new User(
@@ -42,7 +64,11 @@ public class UserService {
                 passwordEncoder.encode(password),
                 identityType);
         user.assignRole(requireSystemRole(Role.GENERAL_USER), null);
-        return userRepository.save(user);
+        User savedUser = userRepository.save(user);
+        if (emailVerificationRequired) {
+            emailVerificationService.consume(normalizedEmail);
+        }
+        return savedUser;
     }
 
     @Transactional
@@ -162,5 +188,28 @@ public class UserService {
         }
 
         return value.trim();
+    }
+
+    private void rejectInvalidVerificationCode(VerificationResult result) {
+        switch (result) {
+            case VALID -> {
+                return;
+            }
+            case INVALID_FORMAT -> throw new ResponseStatusException(
+                    HttpStatus.BAD_REQUEST,
+                    "A valid 6-digit verification code is required");
+            case NOT_REQUESTED -> throw new ResponseStatusException(
+                    HttpStatus.BAD_REQUEST,
+                    "Request a verification code before registering");
+            case EXPIRED -> throw new ResponseStatusException(
+                    HttpStatus.BAD_REQUEST,
+                    "Verification code has expired. Request a new code");
+            case TOO_MANY_ATTEMPTS -> throw new ResponseStatusException(
+                    HttpStatus.TOO_MANY_REQUESTS,
+                    "Too many incorrect attempts. Request a new code");
+            case INCORRECT -> throw new ResponseStatusException(
+                    HttpStatus.BAD_REQUEST,
+                    "Verification code is incorrect");
+        }
     }
 }

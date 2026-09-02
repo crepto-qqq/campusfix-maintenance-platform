@@ -21,7 +21,8 @@ import org.springframework.boot.test.web.server.LocalServerPort;
         properties = {
             "spring.datasource.url=jdbc:h2:mem:f14-status-update;DB_CLOSE_DELAY=-1",
             "spring.jpa.hibernate.ddl-auto=create-drop",
-            "campusfix.bootstrap-admin.password=integration-test-admin-password"
+            "campusfix.bootstrap-admin.password=integration-test-admin-password",
+            "campusfix.registration.email-verification.required=false"
         })
 class F14StatusUpdateIntegrationTest {
 

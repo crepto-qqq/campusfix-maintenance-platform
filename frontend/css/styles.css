@@ -122,6 +122,27 @@ button {
   font-size: 0.85rem;
 }
 
+.verification-code-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 12px;
+  align-items: end;
+}
+
+.verification-code-row label {
+  display: block;
+  margin-bottom: 12px;
+}
+
+.verification-code-row button {
+  white-space: nowrap;
+}
+
+button:disabled {
+  cursor: not-allowed;
+  opacity: 0.65;
+}
+
 .table-scroll {
   overflow-x: auto;
 }
@@ -508,7 +529,8 @@ button {
 
 @media (max-width: 720px) {
   .priority-management-controls,
-  .assignment-management-controls {
+  .assignment-management-controls,
+  .verification-code-row {
     grid-template-columns: 1fr;
   }
 }

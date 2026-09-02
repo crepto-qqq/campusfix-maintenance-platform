@@ -23,9 +23,19 @@ import org.springframework.web.bind.annotation.RestController;
 public class AuthController {
 
     private final UserService userService;
+    private final EmailVerificationService emailVerificationService;
 
-    public AuthController(UserService userService) {
+    public AuthController(
+            UserService userService,
+            EmailVerificationService emailVerificationService) {
         this.userService = userService;
+        this.emailVerificationService = emailVerificationService;
+    }
+
+    @PostMapping("/verification-code")
+    public EmailVerificationService.VerificationCodeDelivery sendVerificationCode(
+            @Valid @RequestBody VerificationCodeRequest request) {
+        return emailVerificationService.requestCode(request.email());
     }
 
     @PostMapping("/register")
@@ -35,7 +45,8 @@ public class AuthController {
                 request.name(),
                 request.email(),
                 request.password(),
-                IdentityType.STUDENT);
+                IdentityType.STUDENT,
+                request.verificationCode());
         return new RegistrationResponse(
                 user.getId(),
                 user.getName(),

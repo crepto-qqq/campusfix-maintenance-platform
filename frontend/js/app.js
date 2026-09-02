@@ -6,6 +6,10 @@ const API_BASE_URL = `http://${window.location.hostname}:8080/api`;
 
 const registrationForm = document.getElementById('registration-form');
 const registrationMessage = document.getElementById('registration-message');
+const verificationEmailInput = document.getElementById('email');
+const verificationCodeInput = document.getElementById('verification-code');
+const sendVerificationCodeButton = document.getElementById('send-verification-code');
+const verificationMessage = document.getElementById('verification-message');
 const loginForm = document.getElementById('login-form');
 const logoutButton = document.getElementById('logout-button');
 const authMessage = document.getElementById('auth-message');
@@ -36,6 +40,60 @@ const adminMessage = document.getElementById('admin-message');
 let currentWorkspaceRole = null;
 let availableTechnicians = [];
 
+if (sendVerificationCodeButton) {
+  sendVerificationCodeButton.addEventListener('click', async () => {
+    if (!verificationEmailInput.checkValidity()) {
+      verificationEmailInput.reportValidity();
+      return;
+    }
+
+    sendVerificationCodeButton.disabled = true;
+    verificationMessage.textContent = 'Sending verification code...';
+
+    try {
+      const response = await fetch(`${API_BASE_URL}/auth/verification-code`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: verificationEmailInput.value })
+      });
+
+      if (!response.ok) {
+        throw new Error(await readApiError(response, `Sending code failed (${response.status}).`));
+      }
+
+      const delivery = await response.json();
+      verificationMessage.textContent = `If this email can be registered, a code has been sent. It expires in ${delivery.expiresInMinutes} minutes.`;
+      verificationCodeInput.focus();
+      startVerificationCooldown(delivery.retryAfterSeconds);
+    } catch (error) {
+      verificationMessage.textContent = error.message;
+      sendVerificationCodeButton.disabled = false;
+    }
+  });
+}
+
+function startVerificationCooldown(seconds) {
+  let remaining = Math.max(1, Number(seconds) || 60);
+  sendVerificationCodeButton.disabled = true;
+  sendVerificationCodeButton.textContent = `Resend in ${remaining}s`;
+
+  const timer = window.setInterval(() => {
+    remaining -= 1;
+    if (remaining <= 0) {
+      window.clearInterval(timer);
+      sendVerificationCodeButton.disabled = false;
+      sendVerificationCodeButton.textContent = 'Resend code';
+      return;
+    }
+    sendVerificationCodeButton.textContent = `Resend in ${remaining}s`;
+  }, 1000);
+}
+
+async function readApiError(response, fallbackMessage) {
+  const data = await response.json().catch(() => null);
+  return data?.detail ?? data?.message ?? fallbackMessage;
+}
+
 if (registrationForm) {
   registrationForm.addEventListener('submit', async (event) => {
     event.preventDefault();
@@ -43,7 +101,8 @@ if (registrationForm) {
     const registrationData = {
       name: document.getElementById('name').value,
       email: document.getElementById('email').value,
-      password: document.getElementById('password').value
+      password: document.getElementById('password').value,
+      verificationCode: document.getElementById('verification-code').value
     };
 
     registrationMessage.textContent = 'Registering...';
@@ -62,7 +121,7 @@ if (registrationForm) {
           throw new Error('This email is already registered.');
         }
 
-        throw new Error(`Registration failed (${response.status}).`);
+        throw new Error(await readApiError(response, `Registration failed (${response.status}).`));
       }
 
       const user = await response.json();

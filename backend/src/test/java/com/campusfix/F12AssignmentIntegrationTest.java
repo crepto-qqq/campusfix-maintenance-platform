@@ -32,7 +32,8 @@ import com.campusfix.ticket.TicketAssignmentRepository;
         properties = {
             "spring.datasource.url=jdbc:h2:mem:f12-assignment;DB_CLOSE_DELAY=-1",
             "spring.jpa.hibernate.ddl-auto=create-drop",
-            "campusfix.bootstrap-admin.password=integration-test-admin-password"
+            "campusfix.bootstrap-admin.password=integration-test-admin-password",
+            "campusfix.registration.email-verification.required=false"
         })
 class F12AssignmentIntegrationTest {
 
