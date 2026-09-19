@@ -2,6 +2,9 @@ package com.campusfix.ticket;
 
 import java.io.IOException;
 import java.util.List;
+import java.util.Map;
+import java.util.LinkedHashMap;
+import java.util.Comparator;
 
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
@@ -76,23 +79,24 @@ public class TicketService {
 
     @Transactional(readOnly = true)
     public List<Ticket> getTicketsForViewer(User viewer) {
-        if (viewer.getRole() == Role.GENERAL_USER) {
-            return getTicketsForUser(viewer.getId());
-        }
-
         if (canViewAllTickets(viewer)) {
             return ticketRepository.findAllByOrderByCreatedAtDesc();
         }
-
-        if (viewer.getRole() == Role.MAINTENANCE_STAFF) {
-            return ticketRepository
-                    .findDistinctByAssignments_Technician_IdAndAssignments_ActiveTrueOrderByCreatedAtDesc(
-                            viewer.getId());
+        Map<Long, Ticket> visible = new LinkedHashMap<>();
+        if (viewer.hasRole(Role.GENERAL_USER)) {
+            getTicketsForUser(viewer.getId()).forEach(ticket -> visible.put(ticket.getId(), ticket));
         }
-
-        throw new ResponseStatusException(
-                HttpStatus.FORBIDDEN,
-                "You cannot view maintenance requests");
+        if (viewer.hasRole(Role.MAINTENANCE_STAFF)) {
+            ticketRepository.findDistinctByAssignments_Technician_IdAndAssignments_ActiveTrueOrderByCreatedAtDesc(
+                    viewer.getId()).forEach(ticket -> visible.put(ticket.getId(), ticket));
+        }
+        if (!viewer.hasRole(Role.GENERAL_USER) && !viewer.hasRole(Role.MAINTENANCE_STAFF)) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "You cannot view maintenance requests");
+        }
+        return visible.values().stream()
+                .sorted(Comparator.comparing(Ticket::getCreatedAt).reversed()
+                        .thenComparing(Ticket::getId, Comparator.reverseOrder()))
+                .toList();
     }
 
     @Transactional(readOnly = true)
@@ -128,7 +132,7 @@ public class TicketService {
             TicketPriority priority,
             String reason,
             User administrator) {
-        if (administrator.getRole() != Role.ADMINISTRATOR) {
+        if (!administrator.hasRole(Role.ADMINISTRATOR)) {
             throw new ResponseStatusException(
                     HttpStatus.FORBIDDEN,
                     "Only an administrator can change operational priority");
@@ -239,7 +243,7 @@ public class TicketService {
 
     @Transactional
     public Ticket updateTicketStatus(Long ticketId, TicketStatus newStatus, User technician) {
-        if (technician.getRole() != Role.MAINTENANCE_STAFF) {
+        if (!technician.hasRole(Role.MAINTENANCE_STAFF)) {
             throw new ResponseStatusException(
                     HttpStatus.FORBIDDEN,
                     "Only assigned maintenance staff can update request status");
@@ -439,20 +443,20 @@ public class TicketService {
     }
 
     private boolean canViewAllTickets(User viewer) {
-        return viewer.getRole() == Role.ADMINISTRATOR
-                || viewer.getRole() == Role.MANAGER;
+        return viewer.hasRole(Role.ADMINISTRATOR)
+                || viewer.hasRole(Role.MANAGER);
     }
 
     private boolean isAssignedTo(Ticket ticket, User viewer) {
         TicketAssignment assignment = ticket.getActiveAssignment();
-        return viewer.getRole() == Role.MAINTENANCE_STAFF
+        return viewer.hasRole(Role.MAINTENANCE_STAFF)
                 && assignment != null
                 && assignment.getTechnician().getId().equals(viewer.getId());
     }
 
     private boolean isAssignableTechnician(User user) {
         return user.getAccountStatus() == AccountStatus.ACTIVE
-                && user.getRole() == Role.MAINTENANCE_STAFF;
+                && user.hasRole(Role.MAINTENANCE_STAFF);
     }
 
     private boolean isAllowedTechnicianStatusTransition(
@@ -463,7 +467,7 @@ public class TicketService {
     }
 
     private void requireAdministrator(User user) {
-        if (user.getRole() != Role.ADMINISTRATOR) {
+        if (!user.hasRole(Role.ADMINISTRATOR)) {
             throw new ResponseStatusException(
                     HttpStatus.FORBIDDEN,
                     "Only an administrator can assign maintenance requests");

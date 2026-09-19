@@ -1,5 +1,7 @@
 package com.campusfix.auth;
 
+import java.util.Set;
+
 import com.campusfix.user.Role;
 import com.campusfix.user.IdentityType;
 import com.campusfix.user.User;
@@ -52,7 +54,8 @@ public class AuthController {
                 user.getName(),
                 user.getEmail(),
                 user.getIdentityType(),
-                user.getRole());
+                user.getRole(),
+                user.getRoles());
     }
 
     @PostMapping("/login")
@@ -66,7 +69,8 @@ public class AuthController {
                 user.getName(),
                 user.getEmail(),
                 user.getIdentityType(),
-                user.getRole());
+                user.getRole(),
+                user.getRoles());
     }
 
     @PostMapping("/logout")
@@ -80,7 +84,8 @@ public class AuthController {
             String name,
             String email,
             IdentityType identityType,
-            Role role) {
+            Role role,
+            Set<Role> roles) {
     }
 
     public record LoginResponse(
@@ -88,6 +93,7 @@ public class AuthController {
             String name,
             String email,
             IdentityType identityType,
-            Role role) {
+            Role role,
+            Set<Role> roles) {
     }
 }

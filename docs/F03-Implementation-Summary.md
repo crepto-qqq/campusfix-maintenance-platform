@@ -1,5 +1,11 @@
 # F03 Implementation Summary
 
+## 多角色更新
+
+当前分支已将单角色管理升级为多角色集合。管理员页面使用复选框；后端按所有有效角色授权，保留旧单角色接口的替换语义。具体接口、权限边界和验收步骤见 [F03 多角色访问控制](F03-RBAC-CN.md)。
+
+下面记录早期单角色版本的实现背景；当前行为以链接文档为准。
+
 ## Completed Work / 已完成工作
 
 - Added `STUDENT` and `CAMPUS_STAFF` identity types.

@@ -2,6 +2,8 @@ package com.campusfix.user;
 
 import java.util.List;
 import java.util.Locale;
+import java.util.Set;
+import java.util.Objects;
 
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
@@ -123,6 +125,7 @@ public class UserService {
 
     @Transactional
     public User updateRole(Long userId, Role role, User administrator) {
+        lockAccessUpdates();
         User user = findUserById(userId);
         return updateAccess(userId, user.getIdentityType(), role, administrator);
     }
@@ -133,26 +136,45 @@ public class UserService {
             IdentityType identityType,
             Role role,
             User administrator) {
-        User user = findUserById(userId);
+        return updateAccess(userId, identityType, Set.of(role), administrator);
+    }
 
-        if (user.getRole() == Role.ADMINISTRATOR
-                && role != Role.ADMINISTRATOR
+    @Transactional
+    public User updateAccess(Long userId, IdentityType identityType, Set<Role> roles, User administrator) {
+        if (identityType == null || roles == null || roles.isEmpty() || roles.stream().anyMatch(Objects::isNull)) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Identity and at least one valid role are required");
+        }
+        // Serialise access updates so two administrators cannot concurrently revoke the last admins.
+        lockAccessUpdates();
+        User actor = findUserById(administrator.getId());
+        if (actor.getAccountStatus() != AccountStatus.ACTIVE || !actor.hasRole(Role.ADMINISTRATOR)) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Administrator access is required");
+        }
+        User user = findUserById(userId);
+        if (user.hasRole(Role.ADMINISTRATOR)
+                && !roles.contains(Role.ADMINISTRATOR)
                 && roleAssignmentRepository.countBySystemRoleCodeAndActiveTrue(Role.ADMINISTRATOR) <= 1) {
-            throw new ResponseStatusException(
-                    HttpStatus.CONFLICT,
-                    "The last administrator cannot be demoted");
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "The last administrator cannot be demoted");
         }
 
         if (user.getIdentityType() != identityType) {
             user.changeIdentityType(identityType, administrator);
         }
-        user.assignRole(requireSystemRole(role), administrator);
+        user.revokeRolesExcept(roles);
+        for (Role selectedRole : roles) {
+            user.assignRole(requireSystemRole(selectedRole), actor);
+        }
         return userRepository.save(user);
     }
 
     @Transactional(readOnly = true)
     public List<User> getAllUsers() {
         return userRepository.findAllWithAccessOrderByNameAndEmail();
+    }
+
+    private void lockAccessUpdates() {
+        systemRoleRepository.lockByCode(Role.ADMINISTRATOR)
+                .orElseThrow(() -> new IllegalStateException("Administrator role is not configured"));
     }
 
     private User findUserById(Long userId) {

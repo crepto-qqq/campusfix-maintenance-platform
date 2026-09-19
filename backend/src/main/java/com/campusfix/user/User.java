@@ -1,7 +1,7 @@
 package com.campusfix.user;
 
 import java.time.LocalDateTime;
-import java.util.Comparator;
+import java.util.EnumSet;
 import java.util.LinkedHashSet;
 import java.util.Set;
 
@@ -111,27 +111,45 @@ public class User {
         touch();
     }
 
+    /** A deterministic display role for older clients, never an authorisation decision. */
     public Role getRole() {
+        for (Role role : new Role[] {Role.ADMINISTRATOR, Role.MANAGER,
+                Role.MAINTENANCE_STAFF, Role.GENERAL_USER}) {
+            if (hasRole(role)) {
+                return role;
+            }
+        }
+        return null;
+    }
+
+    public Set<Role> getRoles() {
+        Set<Role> roles = EnumSet.noneOf(Role.class);
+        roleAssignments.stream().filter(UserRoleAssignment::isActive)
+                .map(assignment -> assignment.getSystemRole().getCode())
+                .forEach(roles::add);
+        return roles;
+    }
+
+    public boolean hasRole(Role role) {
         return roleAssignments.stream()
                 .filter(UserRoleAssignment::isActive)
-                .max(Comparator
-                        .comparing(UserRoleAssignment::getAssignedAt)
-                        .thenComparing(
-                                assignment -> assignment.getId() == null ? Long.MIN_VALUE : assignment.getId()))
-                .map(assignment -> assignment.getSystemRole().getCode())
-                .orElse(null);
+                .anyMatch(assignment ->
+                        assignment.getSystemRole().getCode() == role);
     }
 
     public void assignRole(SystemRole systemRole, User assignedBy) {
-        Role currentRole = getRole();
-        if (currentRole == systemRole.getCode()) {
+        if (hasRole(systemRole.getCode())) {
             return;
         }
 
-        roleAssignments.stream()
-                .filter(UserRoleAssignment::isActive)
-                .forEach(UserRoleAssignment::revoke);
         roleAssignments.add(new UserRoleAssignment(this, systemRole, assignedBy));
+        touch();
+    }
+
+    public void revokeRolesExcept(Set<Role> retainedRoles) {
+        roleAssignments.stream().filter(UserRoleAssignment::isActive)
+                .filter(assignment -> !retainedRoles.contains(assignment.getSystemRole().getCode()))
+                .forEach(UserRoleAssignment::revoke);
         touch();
     }
 
