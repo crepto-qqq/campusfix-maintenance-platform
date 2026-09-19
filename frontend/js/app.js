@@ -434,6 +434,27 @@ function renderTicket(
         <p class="ticket-assignment-message" role="status"></p>
       </div>
     ` : ''}
+    ${canAssignTicket
+      && ticket.assignedTechnicianId
+      && ['ASSIGNED', 'IN_PROGRESS', 'REOPENED'].includes(ticket.status) ? `
+      <div class="assignment-management reassignment-management">
+        <label for="reassignment-technician-${ticket.id}">Reassign Technician</label>
+        <div class="assignment-management-controls">
+          <select id="reassignment-technician-${ticket.id}" class="ticket-reassignment-select">
+            <option value="">Select a different Maintenance Staff member</option>
+            ${createTechnicianOptions(ticket.assignedTechnicianId)}
+          </select>
+          <input
+            class="ticket-reassignment-reason"
+            type="text"
+            maxlength="1000"
+            placeholder="Reason for reassignment"
+            aria-label="Reassignment reason for ${escapeHtml(ticket.title)}">
+          <button type="button" class="ticket-reassignment-save">Reassign Request</button>
+        </div>
+        <p class="ticket-reassignment-message" role="status"></p>
+      </div>
+    ` : ''}
     ${canUpdateStatus && ['ASSIGNED', 'IN_PROGRESS'].includes(ticket.status) ? `
       <div class="status-management">
         <button
@@ -484,6 +505,17 @@ function renderTicket(
     ));
   }
 
+  const reassignmentSaveButton = article.querySelector('.ticket-reassignment-save');
+  if (reassignmentSaveButton) {
+    reassignmentSaveButton.addEventListener('click', () => reassignTicket(
+      ticket.id,
+      article.querySelector('.ticket-reassignment-select'),
+      article.querySelector('.ticket-reassignment-reason'),
+      article.querySelector('.ticket-reassignment-message'),
+      reassignmentSaveButton
+    ));
+  }
+
   const statusSaveButton = article.querySelector('.ticket-status-save');
   if (statusSaveButton) {
     statusSaveButton.addEventListener('click', () => updateTicketStatus(
@@ -499,8 +531,10 @@ function renderTicket(
   return article;
 }
 
-function createTechnicianOptions() {
-  return availableTechnicians.map((technician) => `
+function createTechnicianOptions(excludedTechnicianId = null) {
+  return availableTechnicians
+    .filter((technician) => technician.id !== excludedTechnicianId)
+    .map((technician) => `
     <option value="${technician.id}">
       ${escapeHtml(technician.name)} (${escapeHtml(technician.email)})
     </option>
@@ -535,6 +569,48 @@ async function assignTicket(ticketId, select, message, button) {
 
     await refreshTicketLists();
     allTicketsMessage.textContent = 'Request assigned successfully.';
+  } catch (error) {
+    message.textContent = error.message;
+    button.disabled = false;
+  }
+}
+
+async function reassignTicket(ticketId, select, reasonInput, message, button) {
+  const reason = reasonInput.value.trim();
+  if (!select.value) {
+    message.textContent = 'Please select a different Maintenance Staff member.';
+    return;
+  }
+  if (!reason) {
+    message.textContent = 'Please provide a reason for reassignment.';
+    return;
+  }
+
+  message.textContent = 'Reassigning request...';
+  button.disabled = true;
+
+  try {
+    const response = await fetch(`${API_BASE_URL}/tickets/${ticketId}/reassignment`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
+      body: JSON.stringify({
+        technicianId: Number(select.value),
+        reason
+      })
+    });
+
+    if (response.status === 401) {
+      window.location.href = './index.html';
+      return;
+    }
+    if (!response.ok) {
+      const data = await response.json().catch(() => null);
+      throw new Error(data?.message ?? `Reassignment failed (${response.status}).`);
+    }
+
+    await refreshTicketLists();
+    allTicketsMessage.textContent = 'Request reassigned successfully.';
   } catch (error) {
     message.textContent = error.message;
     button.disabled = false;
