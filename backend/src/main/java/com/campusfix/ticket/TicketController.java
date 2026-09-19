@@ -124,6 +124,19 @@ public class TicketController {
                 administrator));
     }
 
+    @PostMapping("/{ticketId}/reassignment")
+    public TicketResponse reassignTicket(
+            @PathVariable("ticketId") Long ticketId,
+            @Valid @RequestBody TicketReassignmentRequest request,
+            HttpSession session) {
+        User administrator = accessControlService.requireRole(session, Role.ADMINISTRATOR);
+        return createTicketResponse(ticketService.reassignTicket(
+                ticketId,
+                request.technicianId(),
+                request.reason(),
+                administrator));
+    }
+
     @PutMapping("/{ticketId}/status")
     public TicketResponse updateStatus(
             @PathVariable("ticketId") Long ticketId,

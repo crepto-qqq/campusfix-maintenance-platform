@@ -471,11 +471,22 @@ button:disabled {
   box-sizing: border-box;
 }
 
-.ticket-assignment-save {
+.reassignment-management .assignment-management-controls {
+  grid-template-columns: minmax(200px, 1fr) minmax(200px, 1fr) auto;
+}
+
+.reassignment-management input {
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.ticket-assignment-save,
+.ticket-reassignment-save {
   white-space: nowrap;
 }
 
-.ticket-assignment-message {
+.ticket-assignment-message,
+.ticket-reassignment-message {
   min-height: 20px;
   margin: 8px 0 0;
 }
@@ -530,6 +541,7 @@ button:disabled {
 @media (max-width: 720px) {
   .priority-management-controls,
   .assignment-management-controls,
+  .reassignment-management .assignment-management-controls,
   .verification-code-row {
     grid-template-columns: 1fr;
   }

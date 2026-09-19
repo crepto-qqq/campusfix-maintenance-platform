@@ -103,3 +103,54 @@ test('administrator form preserves multiple checks and submits a roles array', a
   assert.equal(p.context.savedBody.role, undefined);
   assert.equal(p.elements['admin-message'].textContent, 'Identity and roles updated.');
 });
+
+test('reassignment excludes the current technician and sends the required reason', async () => {
+  const p = page();
+  p.run(`
+    availableTechnicians = [
+      { id: 11, name: 'Current Tech', email: 'current@test.local' },
+      { id: 22, name: 'New Tech', email: 'new@test.local' }
+    ];
+    refreshTicketLists = async () => {};
+    fetch = async (url, options) => {
+      savedUrl = url;
+      savedMethod = options.method;
+      savedBody = JSON.parse(options.body);
+      return { ok: true, status: 200 };
+    };
+  `);
+
+  const options = p.run('createTechnicianOptions(11)');
+  assert.doesNotMatch(options, /Current Tech/);
+  assert.match(options, /New Tech/);
+
+  p.context.select = { value: '22' };
+  p.context.reasonInput = { value: '  Current technician is unavailable  ' };
+  p.context.message = { textContent: '' };
+  p.context.button = { disabled: false };
+  await p.run('reassignTicket(7, select, reasonInput, message, button)');
+
+  assert.match(p.context.savedUrl, /tickets\/7\/reassignment$/);
+  assert.equal(p.context.savedMethod, 'POST');
+  assert.equal(p.context.savedBody.technicianId, 22);
+  assert.equal(p.context.savedBody.reason, 'Current technician is unavailable');
+  assert.equal(p.elements['all-tickets-message'].textContent, 'Request reassigned successfully.');
+});
+
+test('reassignment requires both a different technician and a reason before calling the API', async () => {
+  const p = page();
+  p.run('fetch = async () => { fetchCalled = true; throw new Error("must not fetch"); };');
+  p.context.select = { value: '' };
+  p.context.reasonInput = { value: '' };
+  p.context.message = { textContent: '' };
+  p.context.button = { disabled: false };
+
+  await p.run('reassignTicket(7, select, reasonInput, message, button)');
+  assert.match(p.context.message.textContent, /different Maintenance Staff/);
+  assert.equal(p.context.fetchCalled, undefined);
+
+  p.context.select.value = '22';
+  await p.run('reassignTicket(7, select, reasonInput, message, button)');
+  assert.match(p.context.message.textContent, /reason/);
+  assert.equal(p.context.fetchCalled, undefined);
+});

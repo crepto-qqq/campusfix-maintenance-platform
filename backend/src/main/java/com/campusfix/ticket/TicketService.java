@@ -188,7 +188,7 @@ public class TicketService {
     public Ticket assignTicket(Long ticketId, Long technicianId, User administrator) {
         requireAdministrator(administrator);
 
-        Ticket ticket = findTicket(ticketId);
+        Ticket ticket = findTicketForUpdate(ticketId);
         if (ticket.getStatus() != TicketStatus.SUBMITTED) {
             if (ticket.getActiveAssignment() != null) {
                 throw new ResponseStatusException(
@@ -205,15 +205,7 @@ public class TicketService {
                     "This request is already assigned; use the F13 reassignment workflow");
         }
 
-        User technician = userRepository.findById(technicianId)
-                .orElseThrow(() -> new ResponseStatusException(
-                        HttpStatus.BAD_REQUEST,
-                        "The selected technician does not exist"));
-        if (!isAssignableTechnician(technician)) {
-            throw new ResponseStatusException(
-                    HttpStatus.BAD_REQUEST,
-                    "The selected user must be an active Maintenance Staff member");
-        }
+        User technician = requireAssignableTechnician(technicianId);
 
         TicketStatus previousStatus = ticket.getStatus();
         TicketAssignment assignment = ticket.assignTo(technician, administrator);
@@ -238,6 +230,66 @@ public class TicketService {
                 "You were assigned maintenance request #" + saved.getId()
                         + ": " + saved.getTitle(),
                 "TICKET_ASSIGNED:" + saved.getId() + ":" + assignment.getId()));
+        return saved;
+    }
+
+    @Transactional
+    public Ticket reassignTicket(
+            Long ticketId,
+            Long technicianId,
+            String reason,
+            User administrator) {
+        requireAdministrator(administrator);
+
+        String normalizedReason = normalizeBlankToNull(reason);
+        if (normalizedReason == null) {
+            throw new ResponseStatusException(
+                    HttpStatus.BAD_REQUEST,
+                    "A reassignment reason is required");
+        }
+
+        Ticket ticket = findTicketForUpdate(ticketId);
+        if (!isReassignableStatus(ticket.getStatus())) {
+            throw new ResponseStatusException(
+                    HttpStatus.CONFLICT,
+                    "Only assigned, in-progress, or reopened requests can be reassigned");
+        }
+
+        TicketAssignment previousAssignment = ticket.getActiveAssignment();
+        if (previousAssignment == null) {
+            throw new ResponseStatusException(
+                    HttpStatus.CONFLICT,
+                    "This request has no active assignment to replace");
+        }
+        if (previousAssignment.getTechnician().getId().equals(technicianId)) {
+            throw new ResponseStatusException(
+                    HttpStatus.CONFLICT,
+                    "Select a different technician for reassignment");
+        }
+
+        User newTechnician = requireAssignableTechnician(technicianId);
+        User previousTechnician = previousAssignment.getTechnician();
+        TicketStatus previousStatus = ticket.getStatus();
+
+        previousAssignment.end(normalizedReason);
+        TicketAssignment newAssignment = ticket.assignTo(newTechnician, administrator);
+        ticket.setStatus(TicketStatus.ASSIGNED);
+        ticket.touch();
+        Ticket saved = ticketRepository.saveAndFlush(ticket);
+
+        recordHistory(
+                saved,
+                TicketEventType.TICKET_REASSIGNED,
+                administrator,
+                assignmentSnapshot(previousStatus, previousTechnician),
+                assignmentSnapshot(saved.getStatus(), newTechnician),
+                normalizedReason);
+        notifyReassignmentParticipants(
+                saved,
+                previousTechnician,
+                newTechnician,
+                administrator,
+                newAssignment);
         return saved;
     }
 
@@ -285,7 +337,9 @@ public class TicketService {
                 notificationType,
                 "Maintenance request #" + saved.getId()
                         + " status changed to " + newStatus,
-                notificationType.name() + ":" + saved.getId() + ":" + newStatus));
+                notificationType.name() + ":" + saved.getId()
+                        + ":" + assignment.getId()
+                        + ":" + newStatus));
         return saved;
     }
 
@@ -436,6 +490,13 @@ public class TicketService {
                         "Ticket not found"));
     }
 
+    private Ticket findTicketForUpdate(Long ticketId) {
+        return ticketRepository.findByIdForUpdate(ticketId)
+                .orElseThrow(() -> new ResponseStatusException(
+                        HttpStatus.NOT_FOUND,
+                        "Ticket not found"));
+    }
+
     private boolean isWorkStarted(Ticket ticket) {
         return ticket.getStatus() == TicketStatus.ASSIGNED
                 || ticket.getStatus() == TicketStatus.IN_PROGRESS
@@ -457,6 +518,55 @@ public class TicketService {
     private boolean isAssignableTechnician(User user) {
         return user.getAccountStatus() == AccountStatus.ACTIVE
                 && user.hasRole(Role.MAINTENANCE_STAFF);
+    }
+
+    private User requireAssignableTechnician(Long technicianId) {
+        User technician = userRepository.findById(technicianId)
+                .orElseThrow(() -> new ResponseStatusException(
+                        HttpStatus.BAD_REQUEST,
+                        "The selected technician does not exist"));
+        if (!isAssignableTechnician(technician)) {
+            throw new ResponseStatusException(
+                    HttpStatus.BAD_REQUEST,
+                    "The selected user must be an active Maintenance Staff member");
+        }
+        return technician;
+    }
+
+    private boolean isReassignableStatus(TicketStatus status) {
+        return status == TicketStatus.ASSIGNED
+                || status == TicketStatus.IN_PROGRESS
+                || status == TicketStatus.REOPENED;
+    }
+
+    private String assignmentSnapshot(TicketStatus status, User technician) {
+        return "status=" + status
+                + " | assigneeId=" + technician.getId()
+                + " | assignee=" + technician.getName();
+    }
+
+    private void notifyReassignmentParticipants(
+            Ticket ticket,
+            User previousTechnician,
+            User newTechnician,
+            User administrator,
+            TicketAssignment assignment) {
+        Map<Long, User> recipients = new LinkedHashMap<>();
+        recipients.put(previousTechnician.getId(), previousTechnician);
+        recipients.put(newTechnician.getId(), newTechnician);
+        recipients.put(ticket.getSubmittedBy().getId(), ticket.getSubmittedBy());
+
+        recipients.values().forEach(recipient -> notificationRepository.save(new InAppNotification(
+                recipient,
+                administrator,
+                ticket,
+                NotificationType.TICKET_REASSIGNED,
+                "Maintenance request #" + ticket.getId()
+                        + " was reassigned from " + previousTechnician.getName()
+                        + " to " + newTechnician.getName(),
+                "TICKET_REASSIGNED:" + ticket.getId()
+                        + ":" + assignment.getId()
+                        + ":" + recipient.getId())));
     }
 
     private boolean isAllowedTechnicianStatusTransition(
