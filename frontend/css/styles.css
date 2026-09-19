@@ -640,3 +640,40 @@ button:disabled {
   width: auto;
   margin: 0;
 }
+
+.completion-evidence-management {
+  margin-top: 1rem;
+  padding-top: 1rem;
+  border-top: 1px solid #d9dee7;
+}
+
+.completion-evidence-management textarea,
+.completion-evidence-management input[type="file"] {
+  display: block;
+  width: 100%;
+  margin: 0.5rem 0;
+}
+
+.completion-evidence-management textarea {
+  min-height: 90px;
+  resize: vertical;
+}
+
+.completion-evidence-list {
+  margin-top: 1rem;
+}
+
+.completion-evidence-item {
+  margin-top: 0.75rem;
+  padding: 0.75rem;
+  border: 1px solid #d9dee7;
+  border-radius: 8px;
+}
+
+.completion-evidence-item img {
+  display: block;
+  max-width: min(100%, 420px);
+  max-height: 280px;
+  margin-top: 0.5rem;
+  object-fit: contain;
+}
