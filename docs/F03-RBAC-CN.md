@@ -1,86 +1,69 @@
-# F03 — 基于角色的访问控制
+# F03 — 多角色访问控制
 
-## 目标
+## 角色与身份
 
-F03让系统根据登录用户在数据库中保存的角色决定其可用入口和后端权限。用户登录时不选择角色，服务器从账号记录中读取角色。
+公开注册只创建 `STUDENT` 身份及 `GENERAL_USER`（Requester）角色。用户不能通过注册或个人资料接口授予自己高级权限。身份与系统角色分开管理。
 
-## 身份和角色
+一个账号现在可以同时拥有多个有效角色：
 
-公开注册固定创建 `STUDENT` 身份和 `GENERAL_USER` 角色，前端显示名称为 Requester。注册请求不能指定Campus Staff身份、管理员或维修人员权限。
+| 角色 | 权限 |
+|---|---|
+| `GENERAL_USER` | 提交报修，查看自己的工单，只能编辑或取消自己的 SUBMITTED 工单 |
+| `MAINTENANCE_STAFF` | 查看有效分配给自己的工单，只能更新自己被分配的维修任务 |
+| `ADMINISTRATOR` | 查看全部工单，管理优先级、分配及用户角色 |
+| `MANAGER` | 查看全部工单及现有优先级汇总；该角色本身不授予修改权限 |
 
-管理员可以分配以下角色：
+组合角色的权限取并集，但所有权、有效分配和状态转换限制仍然适用。例如 Manager + Technician 可查看全部工单，但只能维修分配给自己的工单。管理员如需提交报修或执行维修，也要获得相应角色。
 
-- `GENERAL_USER`：Requester，使用个人维修请求工作区。
-- `MAINTENANCE_STAFF`：Maintenance Staff，后续接入分派工单工作区。
-- `ADMINISTRATOR`：Administrator，管理用户角色。
-- `MANAGER`：Manager，后续接入管理报表工作区。
+## 存储及兼容
 
-当前数据模型采用单角色，与现有用户表保持兼容。如果以后确认同一用户必须同时担任Requester和Technician，再通过数据库迁移升级为多角色关联表。
+沿用已有 `system_roles` 与 `user_role_assignments` 表，无需新增表或删除本地数据库。增加角色保留其他有效角色；撤销角色保留原记录并填写撤销时间；重复保存相同角色不会生成重复授权记录。
 
-## 数据库字段
+注册、登录、个人资料和管理员用户列表响应新增 `roles` 数组。原 `role` 字段保留供旧客户端显示，按 Administrator、Manager、Technician、Requester 顺序选一个，不再用于后端授权。
 
-`app_users`增加或使用以下字段：
+后端每次受保护请求从数据库读取有效角色，撤权在后续请求中生效，无需重新登录。页面按钮在刷新页面后反映新权限。非 ACTIVE 账号不能继续使用既有会话。
 
-| Field | Type | Rule |
-|---|---|---|
-| `identity_type` | Enum String | 非空，现有用户默认 `STUDENT` |
-| `role` | Enum String | 非空，新注册用户默认 `GENERAL_USER` |
+## 管理员接口
 
-本地开发管理员初始化为Campus Staff和Administrator。系统启动时会为旧的空身份或空角色数据补充默认值。
+`GET /api/admin/users` 返回用户资料和角色集合。
 
-## API流程
-
-### 注册
-
-`POST /api/auth/register`
-
-```json
-{
-  "name": "Example Student",
-  "email": "user-3ba43c4927c4@example.invalid",
-  "password": "password123"
-}
-```
-
-响应包含服务器分配的 `STUDENT` 和 `GENERAL_USER`，请求体不能指定身份或角色。
-
-### 登录和当前用户
-
-- `POST /api/auth/login`：建立Session并返回身份和角色。
-- `GET /api/users/me`：返回当前用户资料、身份和角色。
-- `POST /api/auth/logout`：使Session失效。
-
-### 管理员用户管理
-
-- `GET /api/admin/users`：仅Administrator可以读取全部用户及角色。
-- `PUT /api/admin/users/{userId}`：仅Administrator可以同时修改指定用户的大学身份和系统角色。
-
-更新请求示例：
+`PUT /api/admin/users/{userId}` 接收完整的目标角色集合：
 
 ```json
 {
   "identityType": "CAMPUS_STAFF",
-  "role": "MAINTENANCE_STAFF"
+  "roles": ["GENERAL_USER", "MAINTENANCE_STAFF"]
 }
 ```
 
-非管理员返回 `403`；尝试降级最后一名Administrator返回 `409`。
+保留集合中的已有角色、增加新选角色、撤销未选角色。至少保留一个角色；空集合、null 元素、未知角色，以及同时传入 `role` 和 `roles` 均返回 400。
 
-## 前端流程
+为兼容旧客户端，仍接受 `identityType` + 单个 `role`，以及旧 `PUT /api/admin/users/{userId}/role` 接口。这两种旧请求明确表示替换为一个角色，不是追加。
 
-1. Register页面只创建Student Requester，不显示身份或角色选择。
-2. 登录页面保持统一，不显示角色选择。
-3. Requester登录后进入个人维修请求工作区。
-4. Administrator登录后先进入Workspace，并通过Manage Users进入 `admin.html`。
-5. Administrator可以在Users and Roles页面同时修改Identity和Role，保存结果同步到后端和数据库。
-6. Maintenance Staff和Manager进入角色专属占位工作区，当前不会看到Requester操作。
-7. 用户资料页展示University Identity和Role。
+未登录返回 401，非管理员返回 403，撤销最后一个管理员角色返回 409。角色更新使用数据库事务锁串行处理，防止两个管理员同时撤权导致系统没有管理员。
 
-## 已验证场景
+## 前端
 
-- Student注册后数据库身份为 `STUDENT`、角色为 `GENERAL_USER`。
-- Requester可以登录，但访问管理员用户接口返回 `403`。
-- Administrator可以读取用户列表。
-- Administrator可以将Requester调整为Maintenance Staff。
-- 调整后的用户重新登录时返回新角色。
-- 最后一名Administrator不能被降级。
+- Manage Users 采用角色复选框，勾选授予、取消勾选撤销，点击 Save 保存。
+- 工作区与个人资料显示所有角色。
+- Requester + Technician 同时看到“我的报修”和“分配给我的任务”。
+- Administrator / Manager 看到全部工单；具有 Technician 角色时，仅本人被分配任务显示维修状态按钮。
+- 组合角色的工单列表在后端去重。前端的报修与运维区域分别呈现；一个人提交且被分配给自己的工单可以出现在两个区域。
+- 操作完成后刷新两个区域，避免重复展示的工单状态不一致。
+
+## 验证
+
+在 backend 目录运行 `bash ./gradlew test`（Java 21）。测试使用独立内存数据库，不修改本地数据。
+
+在项目根目录运行 `node --test frontend/tests/multiple-roles.test.cjs`，验证组合角色页面逻辑。此测试不代替真实浏览器的布局验收。
+
+自动化覆盖：注册不能提权、组合角色授权、本人/分配工单并集与去重、越权拒绝、即时撤权、角色历史与重复保存、旧接口兼容、最后管理员保护及并发撤权、启动初始化保留组合角色、禁用账号会话。
+
+手动验收：
+
+1. 重启后端、刷新前端；使用管理员账号打开 Manage Users。
+2. 对测试用户勾选 Requester 和 Maintenance Staff，保存后刷新确认两项仍勾选。
+3. 测试用户登录，确认可以提交报修，并看到分配给自己的任务。
+4. 管理员将其他用户的工单分配给该用户；该用户应能推进状态，但不能修改工单内容。
+5. 管理员取消该用户 Maintenance Staff 勾选并保存；用户后续维修请求应返回 403，刷新后维修入口消失，Requester 功能保留。
+6. 尝试取消最后一个管理员的 Administrator 勾选（保留另一角色），应被拒绝。

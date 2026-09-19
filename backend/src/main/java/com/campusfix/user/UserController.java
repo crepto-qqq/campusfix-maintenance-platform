@@ -1,5 +1,7 @@
 package com.campusfix.user;
 
+import java.util.Set;
+
 import java.io.IOException;
 
 import jakarta.servlet.http.HttpSession;
@@ -107,6 +109,7 @@ public class UserController {
                 user.getName(),
                 user.getIdentityType(),
                 user.getRole(),
+                user.getRoles(),
                 user.getContactInformation(),
                 user.getProfileDetails());
     }
@@ -117,6 +120,7 @@ public class UserController {
             String name,
             IdentityType identityType,
             Role role,
+            Set<Role> roles,
             String contactInformation,
             String profileDetails) {
     }

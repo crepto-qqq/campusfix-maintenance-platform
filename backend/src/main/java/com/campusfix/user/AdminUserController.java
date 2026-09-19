@@ -1,5 +1,7 @@
 package com.campusfix.user;
 
+import java.util.Set;
+
 import java.util.List;
 
 import jakarta.servlet.http.HttpSession;
@@ -56,7 +58,7 @@ public class AdminUserController {
         return createResponse(userService.updateAccess(
                 userId,
                 request.identityType(),
-                request.role(),
+                request.selectedRoles(),
                 administrator));
     }
 
@@ -66,7 +68,8 @@ public class AdminUserController {
                 user.getName(),
                 user.getEmail(),
                 user.getIdentityType(),
-                user.getRole());
+                user.getRole(),
+                user.getRoles());
     }
 
     public record AdminUserResponse(
@@ -74,6 +77,7 @@ public class AdminUserController {
             String name,
             String email,
             IdentityType identityType,
-            Role role) {
+            Role role,
+            Set<Role> roles) {
     }
 }

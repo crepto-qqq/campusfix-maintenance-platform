@@ -37,7 +37,28 @@ const profileAvatar = document.getElementById('profile-avatar');
 const adminPage = document.getElementById('admin-page');
 const adminUsersBody = document.getElementById('admin-users-body');
 const adminMessage = document.getElementById('admin-message');
-let currentWorkspaceRole = null;
+let currentWorkspaceUser = null;
+
+function rolesFor(user) {
+  return user?.roles ?? (user?.role ? [user.role] : []);
+}
+
+function hasRole(user, role) {
+  return rolesFor(user).includes(role);
+}
+
+function canViewAllRequests(user) {
+  return hasRole(user, 'ADMINISTRATOR') || hasRole(user, 'MANAGER');
+}
+
+function hasOperationalRole(user) {
+  return canViewAllRequests(user) || hasRole(user, 'MAINTENANCE_STAFF');
+}
+
+async function refreshTicketLists() {
+  if (hasRole(currentWorkspaceUser, 'GENERAL_USER')) await loadTickets();
+  if (hasOperationalRole(currentWorkspaceUser)) await loadAllTickets();
+}
 let availableTechnicians = [];
 
 if (sendVerificationCodeButton) {
@@ -183,50 +204,32 @@ async function initWorkspace() {
     return;
   }
 
+  currentWorkspaceUser = user;
   displayWorkspaceRole(user);
-  currentWorkspaceRole = user.role;
-
-  if (user.role === 'GENERAL_USER') {
-    loadTickets();
-    return;
-  }
 
   document.querySelectorAll('.requester-content').forEach((element) => {
-    element.hidden = true;
+    element.hidden = !hasRole(user, 'GENERAL_USER');
   });
 
   const roleMessage = document.getElementById('role-workspace-message');
-  const roleTitle = document.getElementById('role-workspace-title');
-  const roleDescription = document.getElementById('role-workspace-description');
-  roleMessage.hidden = false;
-  roleTitle.textContent = `${formatRole(user.role)} Workspace`;
-  const descriptions = {
-    MAINTENANCE_STAFF: 'Review the maintenance requests currently assigned to you.',
-    ADMINISTRATOR: 'Review requests, set operational priorities, assign technicians, or use Manage Users to maintain access.',
-    MANAGER: 'Review all maintenance requests below. Management reporting tools will appear here when the reporting workflow is delivered.'
-  };
-  roleDescription.textContent = descriptions[user.role] ?? '';
+  roleMessage.hidden = !hasOperationalRole(user);
+  document.getElementById('role-workspace-title').textContent = 'Your Workspace';
+  document.getElementById('role-workspace-description').textContent =
+    `Your roles: ${rolesFor(user).map(formatRole).join(', ')}.`;
 
-  if (user.role === 'ADMINISTRATOR' || user.role === 'MANAGER' || user.role === 'MAINTENANCE_STAFF') {
+  if (hasOperationalRole(user)) {
     allRequestsSection.hidden = false;
-    allRequestsTitle.textContent = user.role === 'MAINTENANCE_STAFF'
-      ? 'My Assigned Requests'
-      : 'All Maintenance Requests';
-    const descriptionsByRole = {
-      ADMINISTRATOR: 'Review all requests, set priority, and assign submitted work to a technician.',
-      MANAGER: 'Read-only overview of requests submitted by all users.',
-      MAINTENANCE_STAFF: 'Only requests actively assigned to your account are shown.'
-    };
-    allRequestsDescription.textContent = descriptionsByRole[user.role];
-
-    if (user.role === 'ADMINISTRATOR') {
-      await loadAssignableTechnicians();
-    }
-    await loadAllTickets();
-    if (user.role === 'ADMINISTRATOR' || user.role === 'MANAGER') {
-      await loadPrioritySummary();
-    }
+    allRequestsTitle.textContent = canViewAllRequests(user)
+      ? 'All Maintenance Requests' : 'My Assigned Requests';
+    allRequestsDescription.textContent = hasRole(user, 'ADMINISTRATOR')
+      ? 'Review all requests, set priority, and assign submitted work to a technician.'
+      : canViewAllRequests(user)
+        ? 'Review all requests. Technician actions are available only on your active assignments.'
+        : 'Only requests actively assigned to your account are shown.';
+    if (hasRole(user, 'ADMINISTRATOR')) await loadAssignableTechnicians();
+    if (canViewAllRequests(user)) await loadPrioritySummary();
   }
+  await refreshTicketLists();
 }
 
 function getLandingPage(role) {
@@ -254,25 +257,12 @@ async function loadCurrentUser() {
 }
 
 function displayWorkspaceRole(user) {
-  if (!workspaceRole || !user.role) {
-    return;
+  if (workspaceRole) {
+    workspaceRole.textContent = rolesFor(user).map(formatRole).join(' · ');
+    workspaceRole.hidden = false;
   }
-
-  const labels = {
-    GENERAL_USER: 'Requester',
-    MAINTENANCE_STAFF: 'Maintenance Staff',
-    ADMINISTRATOR: 'Administrator',
-    MANAGER: 'Manager'
-  };
-
-  workspaceRole.textContent = labels[user.role] ?? user.role;
-  workspaceRole.classList.add(`role-${user.role.toLowerCase()}`);
-  workspaceRole.hidden = false;
-
   const adminLink = document.getElementById('admin-link');
-  if (adminLink) {
-    adminLink.hidden = user.role !== 'ADMINISTRATOR';
-  }
+  if (adminLink) adminLink.hidden = !hasRole(user, 'ADMINISTRATOR');
 }
 
 async function loadTickets() {
@@ -293,7 +283,7 @@ async function loadTickets() {
     }
 
     const tickets = await response.json();
-    renderTickets(tickets);
+    renderTickets(tickets.filter((ticket) => ticket.submittedById === currentWorkspaceUser.id));
   } catch (error) {
     ticketsMessage.textContent = error.message;
   }
@@ -316,7 +306,9 @@ async function loadAllTickets() {
       throw new Error(`Loading requests failed (${response.status}).`);
     }
 
-    renderAllTickets(await response.json());
+    const tickets = await response.json();
+    renderAllTickets(canViewAllRequests(currentWorkspaceUser) ? tickets
+      : tickets.filter((ticket) => ticket.assignedTechnicianId === currentWorkspaceUser.id));
   } catch (error) {
     allTicketsMessage.textContent = error.message;
   }
@@ -339,7 +331,7 @@ function renderTickets(tickets) {
 
 function renderAllTickets(tickets) {
   if (!tickets || tickets.length === 0) {
-    allTicketsMessage.textContent = currentWorkspaceRole === 'MAINTENANCE_STAFF'
+    allTicketsMessage.textContent = !canViewAllRequests(currentWorkspaceUser)
       ? 'No maintenance requests are currently assigned to you.'
       : 'No maintenance requests have been submitted yet.';
     allTicketsList.innerHTML = '';
@@ -353,9 +345,10 @@ function renderAllTickets(tickets) {
     allTicketsList.appendChild(renderTicket(
       ticket,
       true,
-      currentWorkspaceRole === 'ADMINISTRATOR',
-      currentWorkspaceRole === 'ADMINISTRATOR',
-      currentWorkspaceRole === 'MAINTENANCE_STAFF'
+      hasRole(currentWorkspaceUser, 'ADMINISTRATOR'),
+      hasRole(currentWorkspaceUser, 'ADMINISTRATOR'),
+      hasRole(currentWorkspaceUser, 'MAINTENANCE_STAFF')
+        && ticket.assignedTechnicianId === currentWorkspaceUser.id
     ));
   });
 }
@@ -540,7 +533,7 @@ async function assignTicket(ticketId, select, message, button) {
       throw new Error(data?.message ?? `Assignment failed (${response.status}).`);
     }
 
-    await loadAllTickets();
+    await refreshTicketLists();
     allTicketsMessage.textContent = 'Request assigned successfully.';
   } catch (error) {
     message.textContent = error.message;
@@ -586,7 +579,7 @@ async function updateTicketPriority(ticketId, select, reasonInput, message, butt
       throw new Error(data?.message ?? `Priority update failed (${response.status}).`);
     }
 
-    await loadAllTickets();
+    await refreshTicketLists();
     await loadPrioritySummary();
     allTicketsMessage.textContent = 'Operational priority updated.';
   } catch (error) {
@@ -617,7 +610,7 @@ async function updateTicketStatus(ticketId, status, message, button) {
       throw new Error(data?.message ?? `Status update failed (${response.status}).`);
     }
 
-    await loadAllTickets();
+    await refreshTicketLists();
     allTicketsMessage.textContent = 'Request status updated.';
   } catch (error) {
     message.textContent = error.message;
@@ -887,7 +880,7 @@ async function handleTicketSubmit(event) {
     }
 
     resetTicketForm();
-    await loadTickets();
+    await refreshTicketLists();
   } catch (error) {
     ticketMessage.textContent = error.message;
   }
@@ -943,7 +936,7 @@ async function confirmCancelTicket(ticketId) {
       throw new Error(data?.message ?? `Cancellation failed (${response.status}).`);
     }
 
-    await loadTickets();
+    await refreshTicketLists();
   } catch (error) {
     alert(error.message);
   }
@@ -1143,7 +1136,7 @@ function displayProfile(user) {
   document.getElementById('profile-id').textContent = user.id;
   document.getElementById('profile-email').textContent = user.email;
   document.getElementById('profile-identity-type').textContent = formatIdentityType(user.identityType);
-  document.getElementById('profile-role').textContent = formatRole(user.role);
+  document.getElementById('profile-role').textContent = rolesFor(user).map(formatRole).join(', ');
   document.getElementById('profile-name').value = user.name;
   document.getElementById('contact-information').value = user.contactInformation ?? '';
   document.getElementById('profile-details').value = user.profileDetails ?? '';
@@ -1178,7 +1171,7 @@ async function initAdminPage() {
     return;
   }
 
-  if (user.role !== 'ADMINISTRATOR') {
+  if (!hasRole(user, 'ADMINISTRATOR')) {
     window.location.href = getLandingPage(user.role);
     return;
   }
@@ -1230,17 +1223,28 @@ function renderAdminUsers(users) {
         </select>
       </td>
       <td>
-        <select class="admin-role-select" aria-label="Role for ${escapeHtml(user.name)}">
-          ${createRoleOptions(user.role)}
-        </select>
+        <fieldset class="admin-role-options">
+          <legend>Roles for ${escapeHtml(user.name)}</legend>
+          ${createRoleOptions(rolesFor(user))}
+        </fieldset>
       </td>
       <td><button type="button" class="admin-save-role">Save</button></td>
     `;
 
     row.querySelector('.admin-save-role').addEventListener('click', async () => {
       const identityType = row.querySelector('.admin-identity-select').value;
-      const role = row.querySelector('.admin-role-select').value;
-      await updateAdminUserAccess(user.id, identityType, role);
+      const roles = Array.from(row.querySelectorAll('.admin-role-checkbox:checked'), (input) => input.value);
+      if (roles.length === 0) {
+        adminMessage.textContent = 'Select at least one role before saving.';
+        return;
+      }
+      const button = row.querySelector('.admin-save-role');
+      button.disabled = true;
+      try {
+        await updateAdminUserAccess(user.id, identityType, roles);
+      } finally {
+        button.disabled = false;
+      }
     });
 
     adminUsersBody.appendChild(row);
@@ -1254,22 +1258,23 @@ function createIdentityOptions(selectedIdentityType) {
   `).join('');
 }
 
-function createRoleOptions(selectedRole) {
+function createRoleOptions(selectedRoles) {
   const roles = ['GENERAL_USER', 'MAINTENANCE_STAFF', 'ADMINISTRATOR', 'MANAGER'];
   return roles.map((role) => `
-    <option value="${role}" ${role === selectedRole ? 'selected' : ''}>${formatRole(role)}</option>
+    <label><input class="admin-role-checkbox" type="checkbox" value="${role}"
+      ${selectedRoles.includes(role) ? 'checked' : ''}> ${formatRole(role)}</label>
   `).join('');
 }
 
-async function updateAdminUserAccess(userId, identityType, role) {
-  adminMessage.textContent = 'Updating identity and role...';
+async function updateAdminUserAccess(userId, identityType, roles) {
+  adminMessage.textContent = 'Updating identity and roles...';
 
   try {
     const response = await fetch(`${API_BASE_URL}/admin/users/${userId}`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       credentials: 'include',
-      body: JSON.stringify({ identityType, role })
+      body: JSON.stringify({ identityType, roles })
     });
 
     if (!response.ok) {
@@ -1277,8 +1282,8 @@ async function updateAdminUserAccess(userId, identityType, role) {
       throw new Error(data?.message ?? `User access update failed (${response.status}).`);
     }
 
-    adminMessage.textContent = 'Identity and role updated.';
     await loadAdminUsers();
+    adminMessage.textContent = 'Identity and roles updated.';
   } catch (error) {
     await loadAdminUsers();
     adminMessage.textContent = error.message;

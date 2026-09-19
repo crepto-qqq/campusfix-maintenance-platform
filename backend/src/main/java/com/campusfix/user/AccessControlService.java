@@ -23,13 +23,17 @@ public class AccessControlService {
             throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Login is required");
         }
 
-        return userService.getProfile(id);
+        User user = userService.getProfile(id);
+        if (user.getAccountStatus() != AccountStatus.ACTIVE) {
+            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Account is inactive");
+        }
+        return user;
     }
 
     public User requireRole(HttpSession session, Role... allowedRoles) {
         User user = requireAuthenticatedUser(session);
 
-        if (Arrays.stream(allowedRoles).noneMatch(role -> role == user.getRole())) {
+        if (Arrays.stream(allowedRoles).noneMatch(role -> user.hasRole(role))) {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "You do not have permission for this action");
         }
 
