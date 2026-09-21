@@ -149,6 +149,41 @@ public class TicketController {
                 technician));
     }
 
+    @PostMapping(value = "/{ticketId}/completion-evidence", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    @ResponseStatus(HttpStatus.CREATED)
+    public CompletionEvidenceResponse uploadCompletionEvidence(
+            @PathVariable("ticketId") Long ticketId,
+            @RequestParam("repairNotes") String repairNotes,
+            @RequestParam("image") MultipartFile image,
+            HttpSession session) {
+        validateImage(image);
+        User technician = accessControlService.requireRole(session, Role.MAINTENANCE_STAFF);
+        return createCompletionEvidenceResponse(ticketService.addCompletionEvidence(
+                ticketId, technician, repairNotes, image));
+    }
+
+    @GetMapping("/{ticketId}/completion-evidence")
+    public List<CompletionEvidenceResponse> getCompletionEvidence(
+            @PathVariable("ticketId") Long ticketId,
+            HttpSession session) {
+        User viewer = accessControlService.requireAuthenticatedUser(session);
+        return ticketService.getCompletionEvidence(ticketId, viewer).stream()
+                .map(this::createCompletionEvidenceResponse)
+                .toList();
+    }
+
+    @GetMapping("/{ticketId}/completion-evidence/{evidenceId}/image")
+    public ResponseEntity<byte[]> getCompletionEvidenceImage(
+            @PathVariable("ticketId") Long ticketId,
+            @PathVariable("evidenceId") Long evidenceId,
+            HttpSession session) {
+        User viewer = accessControlService.requireAuthenticatedUser(session);
+        CompletionEvidence evidence = ticketService.getCompletionEvidenceImage(ticketId, evidenceId, viewer);
+        return ResponseEntity.ok()
+                .contentType(MediaType.parseMediaType(evidence.getContentType()))
+                .body(evidence.getImageData());
+    }
+
     @PutMapping("/{ticketId}")
     public TicketResponse updateTicket(
             @PathVariable("ticketId") Long ticketId,
@@ -263,6 +298,16 @@ public class TicketController {
                 imageIds);
     }
 
+    private CompletionEvidenceResponse createCompletionEvidenceResponse(CompletionEvidence evidence) {
+        return new CompletionEvidenceResponse(
+                evidence.getId(),
+                evidence.getTicket().getId(),
+                evidence.getRepairNotes(),
+                evidence.getUploadedBy().getId(),
+                evidence.getUploadedBy().getName(),
+                evidence.getUploadedAt());
+    }
+
     private TicketHistoryResponse createHistoryResponse(TicketHistory history) {
         return new TicketHistoryResponse(
                 history.getId(),
@@ -295,6 +340,15 @@ public class TicketController {
             String submittedByName,
             String submittedByEmail,
             List<Long> imageIds) {
+    }
+
+    public record CompletionEvidenceResponse(
+            Long id,
+            Long ticketId,
+            String repairNotes,
+            Long uploadedById,
+            String uploadedByName,
+            java.time.LocalDateTime uploadedAt) {
     }
 
     public record TicketHistoryResponse(

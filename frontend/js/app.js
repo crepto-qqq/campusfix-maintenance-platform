@@ -455,6 +455,16 @@ function renderTicket(
         <p class="ticket-reassignment-message" role="status"></p>
       </div>
     ` : ''}
+    ${canUpdateStatus && ticket.status === 'IN_PROGRESS' ? `
+      <div class="completion-evidence-management">
+        <label for="completion-notes-${ticket.id}">Completion Evidence</label>
+        <textarea id="completion-notes-${ticket.id}" class="completion-notes" maxlength="2000" placeholder="Describe the repair work completed"></textarea>
+        <input class="completion-image" type="file" accept="image/*">
+        <button type="button" class="completion-evidence-save">Upload Evidence</button>
+        <p class="completion-evidence-message" role="status"></p>
+      </div>
+    ` : ''}
+    <div class="completion-evidence-list" data-ticket-id="${ticket.id}"></div>
     ${canUpdateStatus && ['ASSIGNED', 'IN_PROGRESS'].includes(ticket.status) ? `
       <div class="status-management">
         <button
@@ -515,6 +525,20 @@ function renderTicket(
       reassignmentSaveButton
     ));
   }
+
+  const completionEvidenceButton = article.querySelector('.completion-evidence-save');
+  if (completionEvidenceButton) {
+    completionEvidenceButton.addEventListener('click', () => uploadCompletionEvidence(
+      ticket.id,
+      article.querySelector('.completion-notes'),
+      article.querySelector('.completion-image'),
+      article.querySelector('.completion-evidence-message'),
+      completionEvidenceButton,
+      article.querySelector('.completion-evidence-list')
+    ));
+  }
+
+  loadCompletionEvidence(ticket.id, article.querySelector('.completion-evidence-list'));
 
   const statusSaveButton = article.querySelector('.ticket-status-save');
   if (statusSaveButton) {
@@ -661,6 +685,57 @@ async function updateTicketPriority(ticketId, select, reasonInput, message, butt
   } catch (error) {
     message.textContent = error.message;
     button.disabled = false;
+  }
+}
+
+async function uploadCompletionEvidence(ticketId, notesInput, imageInput, message, button, list) {
+  const notes = notesInput.value.trim();
+  const image = imageInput.files[0];
+  if (!notes || !image) {
+    message.textContent = 'Repair notes and an evidence image are required.';
+    return;
+  }
+
+  button.disabled = true;
+  message.textContent = 'Uploading completion evidence...';
+  try {
+    const formData = new FormData();
+    formData.append('repairNotes', notes);
+    formData.append('image', image);
+    const response = await fetch(`${API_BASE_URL}/tickets/${ticketId}/completion-evidence`, {
+      method: 'POST', credentials: 'include', body: formData
+    });
+    if (response.status === 401) { window.location.href = 'index.html'; return; }
+    if (!response.ok) {
+      const data = await response.json().catch(() => null);
+      throw new Error(data?.message ?? `Evidence upload failed (${response.status}).`);
+    }
+    notesInput.value = '';
+    imageInput.value = '';
+    message.textContent = 'Completion evidence uploaded.';
+    await loadCompletionEvidence(ticketId, list);
+  } catch (error) {
+    message.textContent = error.message;
+  } finally {
+    button.disabled = false;
+  }
+}
+
+async function loadCompletionEvidence(ticketId, container) {
+  if (!container) return;
+  try {
+    const response = await fetch(`${API_BASE_URL}/tickets/${ticketId}/completion-evidence`, { credentials: 'include' });
+    if (!response.ok) return;
+    const evidence = await response.json();
+    if (!evidence.length) { container.innerHTML = ''; return; }
+    container.innerHTML = `<h4>Completion Evidence</h4>${evidence.map((item) => `
+      <div class="completion-evidence-item">
+        <p>${escapeHtml(item.repairNotes)}</p>
+        <p class="ticket-dates">Uploaded by ${escapeHtml(item.uploadedByName)} · ${formatDate(item.uploadedAt)}</p>
+        <img src="${API_BASE_URL}/tickets/${ticketId}/completion-evidence/${item.id}/image" alt="Completion evidence for request ${ticketId}">
+      </div>`).join('')}`;
+  } catch (_) {
+    container.innerHTML = '';
   }
 }
 
@@ -821,6 +896,7 @@ function formatHistoryEvent(eventType) {
     PRIORITY_CHANGED: 'Priority Changed',
     TICKET_ASSIGNED: 'Request Assigned',
     TICKET_REASSIGNED: 'Request Reassigned',
+    COMPLETION_EVIDENCE_ADDED: 'Completion Evidence Added',
     STATUS_CHANGED: 'Status Changed',
     RESOLUTION_CONFIRMED: 'Resolution Confirmed',
     TICKET_REOPENED: 'Request Reopened'

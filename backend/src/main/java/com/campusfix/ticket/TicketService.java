@@ -27,16 +27,19 @@ public class TicketService {
     private final TicketHistoryRepository ticketHistoryRepository;
     private final UserRepository userRepository;
     private final InAppNotificationRepository notificationRepository;
+    private final CompletionEvidenceRepository completionEvidenceRepository;
 
     public TicketService(
             TicketRepository ticketRepository,
             TicketHistoryRepository ticketHistoryRepository,
             UserRepository userRepository,
-            InAppNotificationRepository notificationRepository) {
+            InAppNotificationRepository notificationRepository,
+            CompletionEvidenceRepository completionEvidenceRepository) {
         this.ticketRepository = ticketRepository;
         this.ticketHistoryRepository = ticketHistoryRepository;
         this.userRepository = userRepository;
         this.notificationRepository = notificationRepository;
+        this.completionEvidenceRepository = completionEvidenceRepository;
     }
 
     @Transactional
@@ -341,6 +344,53 @@ public class TicketService {
                         + ":" + assignment.getId()
                         + ":" + newStatus));
         return saved;
+    }
+
+    @Transactional
+    public CompletionEvidence addCompletionEvidence(
+            Long ticketId, User technician, String repairNotes, MultipartFile image) {
+        Ticket ticket = findTicket(ticketId);
+        TicketAssignment assignment = ticket.getActiveAssignment();
+        if (assignment == null || !assignment.getTechnician().getId().equals(technician.getId())) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN,
+                    "Only the assigned technician can upload completion evidence");
+        }
+        if (ticket.getStatus() != TicketStatus.IN_PROGRESS) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT,
+                    "Completion evidence can only be uploaded while work is in progress");
+        }
+        String notes = normalize(repairNotes);
+        if (notes == null || notes.isBlank()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Repair notes are required");
+        }
+        try {
+            CompletionEvidence evidence = completionEvidenceRepository.save(new CompletionEvidence(
+                    ticket, technician, notes, image.getBytes(), image.getContentType()));
+            ticket.touch();
+            ticketRepository.save(ticket);
+            recordHistory(ticket, TicketEventType.COMPLETION_EVIDENCE_ADDED, technician, null,
+                    "Completion evidence #" + evidence.getId(), notes);
+            return evidence;
+        } catch (IOException exception) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Unable to read evidence image");
+        }
+    }
+
+    @Transactional(readOnly = true)
+    public List<CompletionEvidence> getCompletionEvidence(Long ticketId, User viewer) {
+        getTicketForViewer(ticketId, viewer);
+        return completionEvidenceRepository.findByTicketIdOrderByUploadedAtDesc(ticketId);
+    }
+
+    @Transactional(readOnly = true)
+    public CompletionEvidence getCompletionEvidenceImage(Long ticketId, Long evidenceId, User viewer) {
+        getTicketForViewer(ticketId, viewer);
+        CompletionEvidence evidence = completionEvidenceRepository.findById(evidenceId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Completion evidence not found"));
+        if (!evidence.getTicket().getId().equals(ticketId)) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Completion evidence not found");
+        }
+        return evidence;
     }
 
     @Transactional
