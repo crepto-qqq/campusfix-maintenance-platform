@@ -166,6 +166,9 @@ Brevo setup references: [create and verify a sender](https://help.brevo.com/hc/e
 [create and manage API keys](https://help.brevo.com/hc/en-us/articles/209467485-Create-and-manage-your-API-keys), and
 [send a transactional email through the API](https://developers.brevo.com/reference/sendtransacemail).
 
+For team-member setup, IP allowlisting, troubleshooting, and key rotation, see
+the [CampusFix Brevo Email Setup Guide](docs/Brevo_Email_Setup_Guide.md).
+
 The registration workflow is:
 
 1. Enter a real email address and select **Send code**.
