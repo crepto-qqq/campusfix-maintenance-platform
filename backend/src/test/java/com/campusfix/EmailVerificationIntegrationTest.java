@@ -21,6 +21,8 @@ import org.springframework.boot.test.web.server.LocalServerPort;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Import;
 import org.springframework.context.annotation.Primary;
+import org.springframework.http.HttpStatus;
+import org.springframework.web.server.ResponseStatusException;
 
 import com.campusfix.auth.EmailVerificationChallengeRepository;
 import com.campusfix.auth.VerificationEmailGateway;
@@ -126,6 +128,19 @@ class EmailVerificationIntegrationTest {
         assertFalse(userRepository.existsByEmailIgnoreCase("locked@test.local"));
     }
 
+    @Test
+    void failedEmailDeliveryDoesNotLeaveAnUsableChallenge() throws Exception {
+        emailGateway.failNextDelivery();
+
+        HttpResponse<String> delivery = post(
+                "/api/auth/verification-code",
+                "{\"email\":\"delivery-failed@test.local\"}");
+
+        assertEquals(503, delivery.statusCode());
+        assertTrue(challengeRepository.findByEmail("delivery-failed@test.local").isEmpty());
+        assertFalse(userRepository.existsByEmailIgnoreCase("delivery-failed@test.local"));
+    }
+
     private HttpResponse<String> register(String email, String password, String code) throws Exception {
         String codeJson = code == null ? "null" : "\"" + code + "\"";
         return post(
@@ -160,9 +175,16 @@ class EmailVerificationIntegrationTest {
     static class CapturingVerificationEmailGateway implements VerificationEmailGateway {
 
         private final Map<String, String> deliveredCodes = new ConcurrentHashMap<>();
+        private boolean failNextDelivery;
 
         @Override
         public void sendVerificationCode(String recipientEmail, String verificationCode, long validityMinutes) {
+            if (failNextDelivery) {
+                failNextDelivery = false;
+                throw new ResponseStatusException(
+                        HttpStatus.SERVICE_UNAVAILABLE,
+                        "Verification email could not be delivered. Please try again later");
+            }
             deliveredCodes.put(recipientEmail, verificationCode);
         }
 
@@ -172,6 +194,11 @@ class EmailVerificationIntegrationTest {
 
         void clear() {
             deliveredCodes.clear();
+            failNextDelivery = false;
+        }
+
+        void failNextDelivery() {
+            failNextDelivery = true;
         }
     }
 }

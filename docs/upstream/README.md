@@ -82,6 +82,56 @@ Additional features such as image uploads, notifications and data visualisations
 
 Requirement: Java 21.
 
+### One-time local configuration
+
+Each team member runs a separate local copy of CampusFix. The same shared Brevo
+API key works on Windows, macOS, and Linux; it is not tied to a computer or an
+operating system.
+
+From the repository root, create an ignored local configuration file.
+
+Windows PowerShell:
+
+```powershell
+Copy-Item .env.example backend/.env.local
+```
+
+macOS, Linux, or Git Bash:
+
+```bash
+cp .env.example backend/.env.local
+```
+
+Edit `backend/.env.local` and replace every example value:
+
+```properties
+CAMPUSFIX_ADMIN_PASSWORD=your-strong-local-admin-password
+CAMPUSFIX_BREVO_API_KEY=xkeysib-your-shared-private-key
+CAMPUSFIX_EMAIL_FROM_NAME=CampusFix
+CAMPUSFIX_EMAIL_FROM_ADDRESS=your-verified-sender@example.com
+CAMPUSFIX_EMAIL_VERIFICATION_REQUIRED=true
+```
+
+`backend/.env.local` is loaded automatically and ignored by Git. Never commit,
+email, screenshot, or paste its API key into the front-end. Share the key only
+through the team's agreed private channel. The repository contains only
+`.env.example`, which has placeholder values.
+
+The optional interactive setup wizard opens the relevant Brevo pages and writes
+the local file without displaying the API key.
+
+Windows PowerShell (Git Bash is not required):
+
+```powershell
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\setup-brevo-email.ps1
+```
+
+macOS or Linux:
+
+```bash
+bash scripts/setup-brevo-email.sh
+```
+
 ### Start the back-end
 
 ```bash
@@ -89,34 +139,32 @@ cd backend
 ./gradlew bootRun
 ```
 
-On Windows, use `.\gradlew.bat bootRun` for the back-end command.
-
-Before the first start of a new local database, set a local administrator
-password through the environment. Never put the real value in Git-tracked
-configuration:
-
-```powershell
-$env:CAMPUSFIX_ADMIN_PASSWORD='use-a-strong-local-password'
-.\gradlew.bat bootRun
-```
+On Windows, use `.\gradlew.bat bootRun` for the back-end command. The back-end
+runs at `http://localhost:8080`.
 
 ### Enable real registration email verification
 
-Registration uses the Resend HTTPS API. Create a Resend API key and provide it
-to the same terminal that starts the back-end. Do not put the key in
-`application.properties`, `.env.example`, a screenshot, or a Git commit.
+Registration uses Brevo's Transactional Email REST API. It calls
+`POST https://api.brevo.com/v3/smtp/email` from the back-end with the private
+API key in the `api-key` request header. The API key is never sent to the
+browser.
 
-```powershell
-$env:CAMPUSFIX_RESEND_API_KEY='re_your_private_key'
-$env:CAMPUSFIX_EMAIL_FROM='CampusFix <user-4e69d735baaf@example.invalid>'
-.\gradlew.bat bootRun
-```
+The Brevo account owner performs this one-time shared setup:
 
-The default `user-4e69d735baaf@example.invalid` sender can only send test messages to the
-email address associated with the Resend account. To send verification codes
-to other students, verify a domain in Resend and change
-`CAMPUSFIX_EMAIL_FROM` to an address on that domain, for example
-`CampusFix <verify@updates.example.com>`.
+1. Create or sign in to the team's Brevo account.
+2. Open **Settings → Senders & IP → Senders**, add the dedicated CampusFix
+   mailbox, and enter the verification code delivered to that mailbox.
+3. Open **Settings → SMTP & API → API Keys & MCP**, generate an API key named
+   `CampusFix shared demo`, and copy it when it is shown. Brevo shows it only
+   once.
+4. Set an expiry that covers the assessment period, or manually deactivate the
+   key no later than **7 November 2026**.
+5. Privately give each member the verified sender address and shared key. Each
+   member stores them only in their own `backend/.env.local`.
+
+Brevo setup references: [create and verify a sender](https://help.brevo.com/hc/en-us/articles/208836149-Create-a-new-sender-From-name-and-From-email),
+[create and manage API keys](https://help.brevo.com/hc/en-us/articles/209467485-Create-and-manage-your-API-keys), and
+[send a transactional email through the API](https://developers.brevo.com/reference/sendtransacemail).
 
 The registration workflow is:
 
@@ -131,7 +179,24 @@ and are removed after successful registration.
 
 ### Open the front-end
 
-Open `frontend/index.html` directly in a browser, or use the VS Code Live Server extension.
+From the repository root, serve the front-end over HTTP so browser sessions and
+API calls behave consistently.
+
+Windows:
+
+```powershell
+py -m http.server 5500 --directory frontend
+```
+
+macOS or Linux:
+
+```bash
+python3 -m http.server 5500 --directory frontend
+```
+
+Open `http://localhost:5500/index.html`. Every team member starts both commands
+on their own computer. Separate browsers or private windows can be used to
+demonstrate different signed-in users on the same computer.
 
 ## Database Design
 
