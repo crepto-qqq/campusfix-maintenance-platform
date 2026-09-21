@@ -91,9 +91,60 @@ cd backend
 
 On Windows, use `.\gradlew.bat bootRun` for the back-end command.
 
+Before the first start of a new local database, set a local administrator
+password through the environment. Never put the real value in Git-tracked
+configuration:
+
+```powershell
+$env:CAMPUSFIX_ADMIN_PASSWORD='use-a-strong-local-password'
+.\gradlew.bat bootRun
+```
+
+### Enable real registration email verification
+
+Registration uses the Resend HTTPS API. Create a Resend API key and provide it
+to the same terminal that starts the back-end. Do not put the key in
+`application.properties`, `.env.example`, a screenshot, or a Git commit.
+
+```powershell
+$env:CAMPUSFIX_RESEND_API_KEY='re_your_private_key'
+$env:CAMPUSFIX_EMAIL_FROM='CampusFix <user-4e69d735baaf@example.invalid>'
+.\gradlew.bat bootRun
+```
+
+The default `user-4e69d735baaf@example.invalid` sender can only send test messages to the
+email address associated with the Resend account. To send verification codes
+to other students, verify a domain in Resend and change
+`CAMPUSFIX_EMAIL_FROM` to an address on that domain, for example
+`CampusFix <verify@updates.example.com>`.
+
+The registration workflow is:
+
+1. Enter a real email address and select **Send code**.
+2. Enter the six-digit code received by email within 10 minutes.
+3. Submit the registration form. Public registration always creates a Student
+   identity with Requester access.
+
+The API enforces a 60-second resend cooldown and locks a code after five
+incorrect attempts. Verification codes are stored only as salted BCrypt hashes
+and are removed after successful registration.
+
 ### Open the front-end
 
 Open `frontend/index.html` directly in a browser, or use the VS Code Live Server extension.
+
+## Database Design
+
+The authentication account, user profile, campus identity and role assignments are stored in normalized relational tables. See [Database ERD and user normalization](docs/Database-ERD-User-Normalization.md).
+
+Implemented workflow documentation: [F11 priority classification](docs/F11-Priority-Classification-CN.md) and [F12 ticket assignment](docs/F12-Ticket-Assignment-CN.md).
+
+The application resolves the repository location at startup and always uses the
+repository-level `data/campusfix` H2 database. Its location does not change when
+the back-end is launched from the repository, `backend`, or `frontend`
+directory. The configuration intentionally has no relative-path fallback, so a
+stale launch cannot silently create another database. Existing legacy user data
+is migrated automatically on first startup.
 
 ## Team Members and Responsibilities
 

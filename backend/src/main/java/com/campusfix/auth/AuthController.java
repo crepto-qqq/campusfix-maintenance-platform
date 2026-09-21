@@ -1,6 +1,9 @@
 package com.campusfix.auth;
 
+import java.util.Set;
+
 import com.campusfix.user.Role;
+import com.campusfix.user.IdentityType;
 import com.campusfix.user.User;
 import com.campusfix.user.UserService;
 import jakarta.servlet.http.HttpSession;
@@ -22,16 +25,37 @@ import org.springframework.web.bind.annotation.RestController;
 public class AuthController {
 
     private final UserService userService;
+    private final EmailVerificationService emailVerificationService;
 
-    public AuthController(UserService userService) {
+    public AuthController(
+            UserService userService,
+            EmailVerificationService emailVerificationService) {
         this.userService = userService;
+        this.emailVerificationService = emailVerificationService;
+    }
+
+    @PostMapping("/verification-code")
+    public EmailVerificationService.VerificationCodeDelivery sendVerificationCode(
+            @Valid @RequestBody VerificationCodeRequest request) {
+        return emailVerificationService.requestCode(request.email());
     }
 
     @PostMapping("/register")
     @ResponseStatus(HttpStatus.CREATED)
     public RegistrationResponse register(@Valid @RequestBody RegistrationRequest request) {
-        User user = userService.register(request.name(), request.email(), request.password());
-        return new RegistrationResponse(user.getId(), user.getName(), user.getEmail(), user.getRole());
+        User user = userService.register(
+                request.name(),
+                request.email(),
+                request.password(),
+                IdentityType.STUDENT,
+                request.verificationCode());
+        return new RegistrationResponse(
+                user.getId(),
+                user.getName(),
+                user.getEmail(),
+                user.getIdentityType(),
+                user.getRole(),
+                user.getRoles());
     }
 
     @PostMapping("/login")
@@ -40,7 +64,13 @@ public class AuthController {
             HttpSession session) {
         User user = userService.login(request.email(), request.password());
         session.setAttribute("userId", user.getId());
-        return new LoginResponse(user.getId(), user.getName(), user.getEmail(), user.getRole());
+        return new LoginResponse(
+                user.getId(),
+                user.getName(),
+                user.getEmail(),
+                user.getIdentityType(),
+                user.getRole(),
+                user.getRoles());
     }
 
     @PostMapping("/logout")
@@ -49,9 +79,21 @@ public class AuthController {
         session.invalidate();
     }
 
-    public record RegistrationResponse(Long id, String name, String email, Role role) {
+    public record RegistrationResponse(
+            Long id,
+            String name,
+            String email,
+            IdentityType identityType,
+            Role role,
+            Set<Role> roles) {
     }
 
-    public record LoginResponse(Long id, String name, String email, Role role) {
+    public record LoginResponse(
+            Long id,
+            String name,
+            String email,
+            IdentityType identityType,
+            Role role,
+            Set<Role> roles) {
     }
 }

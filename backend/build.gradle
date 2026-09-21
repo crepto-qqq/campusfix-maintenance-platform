@@ -33,3 +33,13 @@ dependencies {
 tasks.named('test') {
     useJUnitPlatform()
 }
+
+tasks.named('bootRun') {
+    // Keep the database path stable whether the app is started from VS Code or
+    // with backend/gradlew: both now use the repository-level data directory.
+    workingDir = projectDir.parentFile
+}
+
+tasks.withType(JavaCompile).configureEach {
+    options.compilerArgs.add('-parameters')
+}

@@ -2,7 +2,9 @@ package com.campusfix.ticket;
 
 import java.time.LocalDateTime;
 import java.util.ArrayList;
+import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Set;
 
 import com.campusfix.user.User;
 
@@ -16,12 +18,17 @@ import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
+import jakarta.persistence.Index;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.OneToMany;
 import jakarta.persistence.Table;
 
 @Entity
-@Table(name = "tickets")
+@Table(
+        name = "tickets",
+        indexes = @Index(
+                name = "idx_tickets_operational_priority",
+                columnList = "operational_priority"))
 public class Ticket {
 
     @Id
@@ -46,8 +53,12 @@ public class Ticket {
     private UrgencyLevel urgency;
 
     @Enumerated(EnumType.STRING)
+    @Column(name = "operational_priority", length = 30)
+    private TicketPriority operationalPriority;
+
+    @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 30)
-    private TicketStatus status = TicketStatus.PENDING;
+    private TicketStatus status = TicketStatus.SUBMITTED;
 
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "submitted_by", nullable = false)
@@ -61,6 +72,9 @@ public class Ticket {
 
     @OneToMany(mappedBy = "ticket", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.EAGER)
     private List<TicketImage> images = new ArrayList<>();
+
+    @OneToMany(mappedBy = "ticket", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
+    private Set<TicketAssignment> assignments = new LinkedHashSet<>();
 
     protected Ticket() {
     }
@@ -128,6 +142,14 @@ public class Ticket {
         this.urgency = urgency;
     }
 
+    public TicketPriority getOperationalPriority() {
+        return operationalPriority;
+    }
+
+    public void setOperationalPriority(TicketPriority operationalPriority) {
+        this.operationalPriority = operationalPriority;
+    }
+
     public TicketStatus getStatus() {
         return status;
     }
@@ -155,5 +177,22 @@ public class Ticket {
     public void addImage(TicketImage image) {
         image.setTicket(this);
         this.images.add(image);
+    }
+
+    public Set<TicketAssignment> getAssignments() {
+        return assignments;
+    }
+
+    public TicketAssignment getActiveAssignment() {
+        return assignments.stream()
+                .filter(TicketAssignment::isActive)
+                .findFirst()
+                .orElse(null);
+    }
+
+    public TicketAssignment assignTo(User technician, User administrator) {
+        TicketAssignment assignment = new TicketAssignment(this, technician, administrator);
+        assignments.add(assignment);
+        return assignment;
     }
 }

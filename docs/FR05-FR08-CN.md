@@ -66,7 +66,7 @@
 
 ### TicketStatus（请求状态）
 
-`PENDING`（待处理）、`ASSIGNED`（已分配）、`IN_PROGRESS`（处理中）、`COMPLETED`（已完成）、`CANCELLED`（已取消）
+`SUBMITTED`（已提交）、`ASSIGNED`（已分配）、`IN_PROGRESS`（处理中）、`COMPLETED`（已完成）、`CLOSED`（已关闭）、`REOPENED`（已重新打开）、`CANCELLED`（已取消）
 
 ### TicketCategory（维修类别）
 
@@ -93,8 +93,8 @@
 | POST | `/tickets` | 创建维修请求 |
 | GET | `/tickets` | 列出当前用户的请求（最新优先） |
 | GET | `/tickets/{ticketId}` | 获取当前用户拥有的单条请求 |
-| PUT | `/tickets/{ticketId}` | 编辑请求（仅 `PENDING` 状态） |
-| POST | `/tickets/{ticketId}/cancel` | 取消请求（仅 `PENDING` 状态） |
+| PUT | `/tickets/{ticketId}` | 编辑请求（仅 `SUBMITTED` 状态） |
+| POST | `/tickets/{ticketId}/cancel` | 取消请求（仅 `SUBMITTED` 状态） |
 
 ### 图片（FR06）
 
@@ -102,7 +102,7 @@
 |---|---|---|
 | POST | `/tickets/{ticketId}/images` | 上传一张图片（`multipart/form-data`，字段名为 `image`） |
 | GET | `/tickets/{ticketId}/images/{imageId}` | 查看图片 |
-| DELETE | `/tickets/{ticketId}/images/{imageId}` | 删除图片（仅 `PENDING` 状态） |
+| DELETE | `/tickets/{ticketId}/images/{imageId}` | 删除图片（仅 `SUBMITTED` 状态） |
 
 ### 角色管理（FR04）
 
@@ -136,7 +136,7 @@
   "category": "HVAC",
   "location": "图书馆三楼",
   "urgency": "HIGH",
-  "status": "PENDING",
+  "status": "SUBMITTED",
   "createdAt": "2026-08-22T15:00:00",
   "updatedAt": "2026-08-22T15:00:00",
   "imageIds": [1, 2]
@@ -155,9 +155,9 @@
 
 ## 6. 业务规则
 
-- 新请求创建后状态为 `PENDING`。
+- 新请求创建后状态为 `SUBMITTED`。
 - 用户只能查看和修改自己的请求；访问他人请求返回 `404` 或 `403`。
-- 编辑、取消、添加图片和删除图片**仅在状态为 `PENDING` 时允许**（即维修工作开始前）。当状态为 `ASSIGNED`、`IN_PROGRESS` 或 `COMPLETED` 时，这些操作返回 `409 CONFLICT`。
+- 编辑、取消、添加图片和删除图片**仅在状态为 `SUBMITTED` 时允许**（即维修工作开始前）。其他状态返回 `409 CONFLICT`。
 - 图片限制：
   - 每个请求最多 5 张图片。
   - 每张图片最大 15 MB。
@@ -185,7 +185,7 @@
 
 | 邮箱 | 密码 |
 |---|---|
-| admin@campusfix.edu | admin12345 |
+| admin@campusfix.edu | 使用本机环境变量 `CAMPUSFIX_ADMIN_PASSWORD` 设置的值 |
 
 > 如果数据库是由旧版本应用创建的，删除 `backend/data` 后重启，以便创建新的 `role` 列。
 
@@ -199,7 +199,7 @@
 | 4 | 查看工作台右上角 | 显示蓝色 `General User` 徽章 |
 | 5 | 打开个人资料页 | 显示 `Role: General User` |
 | 6 | 退出登录 | 返回登录页 |
-| 7 | 用 `admin@campusfix.edu` / `admin12345` 登录 | 显示红色 `Administrator` 徽章 |
+| 7 | 用 `admin@campusfix.edu` / 本机设置的管理员密码登录 | 显示红色 `Administrator` 徽章 |
 
 ### 7.3 提交请求（FR05）
 
@@ -261,7 +261,7 @@
 |---|---|---|
 | 1 | 未登录打开 `workspace.html` | 跳转到登录页 |
 | 2 | 未登录打开 `profile.html` | 跳转到登录页 |
-| 3 | 编辑非 `PENDING` 状态的请求（通过 API） | `409` |
+| 3 | 编辑非 `SUBMITTED` 状态的请求（通过 API） | `409` |
 | 4 | 在标题中注入 `<script>alert(1)</script>` | 以纯文本显示，不弹窗（XSS 已转义） |
 
 ---
@@ -283,7 +283,7 @@ feat: implement maintenance request management (FR05-FR08)
 
 - Add ticket entity, repository, service, and REST controller
 - Add issue image upload/view/delete with size/count validation
-- Add edit and cancel (only while PENDING)
+- Add edit and cancel (only while SUBMITTED)
 - Add request history listing for the current user
 - Add role field and admin-only role update endpoint (FR04)
 - Rebuild workspace UI for request submission and tracking

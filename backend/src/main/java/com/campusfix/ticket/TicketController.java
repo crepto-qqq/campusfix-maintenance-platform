@@ -20,7 +20,8 @@ import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.server.ResponseStatusException;
 
 import com.campusfix.user.User;
-import com.campusfix.user.UserService;
+import com.campusfix.user.AccessControlService;
+import com.campusfix.user.Role;
 
 import jakarta.servlet.http.HttpSession;
 import jakarta.validation.Valid;
@@ -37,11 +38,13 @@ public class TicketController {
     private static final int MAX_IMAGES_PER_TICKET = 5;
 
     private final TicketService ticketService;
-    private final UserService userService;
+    private final AccessControlService accessControlService;
 
-    public TicketController(TicketService ticketService, UserService userService) {
+    public TicketController(
+            TicketService ticketService,
+            AccessControlService accessControlService) {
         this.ticketService = ticketService;
-        this.userService = userService;
+        this.accessControlService = accessControlService;
     }
 
     @PostMapping
@@ -49,62 +52,171 @@ public class TicketController {
     public TicketResponse createTicket(
             @Valid @RequestBody TicketRequest request,
             HttpSession session) {
-        User user = userService.getProfile(getLoggedInUserId(session));
+        User user = accessControlService.requireRole(session, Role.GENERAL_USER);
         Ticket ticket = ticketService.createTicket(request, user);
         return createTicketResponse(ticket);
     }
 
     @GetMapping
-    public List<TicketResponse> getMyTickets(HttpSession session) {
-        Long userId = getLoggedInUserId(session);
-        return ticketService.getTicketsForUser(userId).stream()
+    public List<TicketResponse> getVisibleTickets(HttpSession session) {
+        User viewer = accessControlService.requireAuthenticatedUser(session);
+        return ticketService.getTicketsForViewer(viewer).stream()
                 .map(this::createTicketResponse)
+                .toList();
+    }
+
+    @GetMapping("/priority-summary")
+    public TicketPrioritySummary getPrioritySummary(HttpSession session) {
+        User viewer = accessControlService.requireAuthenticatedUser(session);
+        return ticketService.getPrioritySummary(viewer);
+    }
+
+    @GetMapping("/technicians")
+    public List<TechnicianResponse> getAssignableTechnicians(HttpSession session) {
+        User administrator = accessControlService.requireRole(session, Role.ADMINISTRATOR);
+        return ticketService.getAssignableTechnicians(administrator).stream()
+                .map(user -> new TechnicianResponse(user.getId(), user.getName(), user.getEmail()))
                 .toList();
     }
 
     @GetMapping("/{ticketId}")
     public TicketResponse getTicket(
-            @PathVariable Long ticketId,
+            @PathVariable("ticketId") Long ticketId,
             HttpSession session) {
-        Ticket ticket = ticketService.getTicketForUser(
-                ticketId,
-                getLoggedInUserId(session));
+        User viewer = accessControlService.requireAuthenticatedUser(session);
+        Ticket ticket = ticketService.getTicketForViewer(ticketId, viewer);
         return createTicketResponse(ticket);
+    }
+
+    @GetMapping("/{ticketId}/history")
+    public List<TicketHistoryResponse> getTicketHistory(
+            @PathVariable("ticketId") Long ticketId,
+            HttpSession session) {
+        User viewer = accessControlService.requireAuthenticatedUser(session);
+        return ticketService.getTicketHistory(ticketId, viewer).stream()
+                .map(this::createHistoryResponse)
+                .toList();
+    }
+
+    @PutMapping("/{ticketId}/priority")
+    public TicketResponse updatePriority(
+            @PathVariable("ticketId") Long ticketId,
+            @Valid @RequestBody TicketPriorityUpdateRequest request,
+            HttpSession session) {
+        User administrator = accessControlService.requireRole(session, Role.ADMINISTRATOR);
+        Ticket ticket = ticketService.updateOperationalPriority(
+                ticketId,
+                request.priority(),
+                request.reason(),
+                administrator);
+        return createTicketResponse(ticket);
+    }
+
+    @PostMapping("/{ticketId}/assignment")
+    public TicketResponse assignTicket(
+            @PathVariable("ticketId") Long ticketId,
+            @Valid @RequestBody TicketAssignmentRequest request,
+            HttpSession session) {
+        User administrator = accessControlService.requireRole(session, Role.ADMINISTRATOR);
+        return createTicketResponse(ticketService.assignTicket(
+                ticketId,
+                request.technicianId(),
+                administrator));
+    }
+
+    @PostMapping("/{ticketId}/reassignment")
+    public TicketResponse reassignTicket(
+            @PathVariable("ticketId") Long ticketId,
+            @Valid @RequestBody TicketReassignmentRequest request,
+            HttpSession session) {
+        User administrator = accessControlService.requireRole(session, Role.ADMINISTRATOR);
+        return createTicketResponse(ticketService.reassignTicket(
+                ticketId,
+                request.technicianId(),
+                request.reason(),
+                administrator));
+    }
+
+    @PutMapping("/{ticketId}/status")
+    public TicketResponse updateStatus(
+            @PathVariable("ticketId") Long ticketId,
+            @Valid @RequestBody TicketStatusUpdateRequest request,
+            HttpSession session) {
+        User technician = accessControlService.requireRole(session, Role.MAINTENANCE_STAFF);
+        return createTicketResponse(ticketService.updateTicketStatus(
+                ticketId,
+                request.status(),
+                technician));
+    }
+
+    @PostMapping(value = "/{ticketId}/completion-evidence", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    @ResponseStatus(HttpStatus.CREATED)
+    public CompletionEvidenceResponse uploadCompletionEvidence(
+            @PathVariable("ticketId") Long ticketId,
+            @RequestParam("repairNotes") String repairNotes,
+            @RequestParam("image") MultipartFile image,
+            HttpSession session) {
+        validateImage(image);
+        User technician = accessControlService.requireRole(session, Role.MAINTENANCE_STAFF);
+        return createCompletionEvidenceResponse(ticketService.addCompletionEvidence(
+                ticketId, technician, repairNotes, image));
+    }
+
+    @GetMapping("/{ticketId}/completion-evidence")
+    public List<CompletionEvidenceResponse> getCompletionEvidence(
+            @PathVariable("ticketId") Long ticketId,
+            HttpSession session) {
+        User viewer = accessControlService.requireAuthenticatedUser(session);
+        return ticketService.getCompletionEvidence(ticketId, viewer).stream()
+                .map(this::createCompletionEvidenceResponse)
+                .toList();
+    }
+
+    @GetMapping("/{ticketId}/completion-evidence/{evidenceId}/image")
+    public ResponseEntity<byte[]> getCompletionEvidenceImage(
+            @PathVariable("ticketId") Long ticketId,
+            @PathVariable("evidenceId") Long evidenceId,
+            HttpSession session) {
+        User viewer = accessControlService.requireAuthenticatedUser(session);
+        CompletionEvidence evidence = ticketService.getCompletionEvidenceImage(ticketId, evidenceId, viewer);
+        return ResponseEntity.ok()
+                .contentType(MediaType.parseMediaType(evidence.getContentType()))
+                .body(evidence.getImageData());
     }
 
     @PutMapping("/{ticketId}")
     public TicketResponse updateTicket(
-            @PathVariable Long ticketId,
+            @PathVariable("ticketId") Long ticketId,
             @Valid @RequestBody TicketRequest request,
             HttpSession session) {
         Ticket ticket = ticketService.updateTicket(
                 ticketId,
-                getLoggedInUserId(session),
+                getRequesterId(session),
                 request);
         return createTicketResponse(ticket);
     }
 
     @PostMapping("/{ticketId}/cancel")
     public TicketResponse cancelTicket(
-            @PathVariable Long ticketId,
+            @PathVariable("ticketId") Long ticketId,
             HttpSession session) {
         Ticket ticket = ticketService.cancelTicket(
                 ticketId,
-                getLoggedInUserId(session));
+                getRequesterId(session));
         return createTicketResponse(ticket);
     }
 
     @PostMapping(value = "/{ticketId}/images", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void uploadImage(
-            @PathVariable Long ticketId,
+            @PathVariable("ticketId") Long ticketId,
             @RequestParam("image") MultipartFile image,
             HttpSession session) {
         validateImage(image);
 
         Ticket ticket = ticketService.getTicketForUser(
                 ticketId,
-                getLoggedInUserId(session));
+                getRequesterId(session));
 
         if (ticket.getImages().size() >= MAX_IMAGES_PER_TICKET) {
             throw new ResponseStatusException(
@@ -112,30 +224,28 @@ public class TicketController {
                     "A request cannot have more than " + MAX_IMAGES_PER_TICKET + " images");
         }
 
-        ticketService.addTicketImage(ticketId, getLoggedInUserId(session), image);
+        ticketService.addTicketImage(ticketId, getRequesterId(session), image);
     }
 
     @DeleteMapping("/{ticketId}/images/{imageId}")
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void deleteImage(
-            @PathVariable Long ticketId,
-            @PathVariable Long imageId,
+            @PathVariable("ticketId") Long ticketId,
+            @PathVariable("imageId") Long imageId,
             HttpSession session) {
         ticketService.deleteTicketImage(
                 ticketId,
-                getLoggedInUserId(session),
+                getRequesterId(session),
                 imageId);
     }
 
     @GetMapping("/{ticketId}/images/{imageId}")
     public ResponseEntity<byte[]> getImage(
-            @PathVariable Long ticketId,
-            @PathVariable Long imageId,
+            @PathVariable("ticketId") Long ticketId,
+            @PathVariable("imageId") Long imageId,
             HttpSession session) {
-        TicketImage image = ticketService.getTicketImage(
-                ticketId,
-                getLoggedInUserId(session),
-                imageId);
+        User viewer = accessControlService.requireAuthenticatedUser(session);
+        TicketImage image = ticketService.getTicketImage(ticketId, viewer, imageId);
 
         return ResponseEntity.ok()
                 .contentType(MediaType.parseMediaType(image.getContentType()))
@@ -157,20 +267,15 @@ public class TicketController {
         }
     }
 
-    private Long getLoggedInUserId(HttpSession session) {
-        Object userId = session.getAttribute("userId");
-
-        if (userId instanceof Long id) {
-            return id;
-        }
-
-        throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Login is required");
+    private Long getRequesterId(HttpSession session) {
+        return accessControlService.requireRole(session, Role.GENERAL_USER).getId();
     }
 
     private TicketResponse createTicketResponse(Ticket ticket) {
         List<Long> imageIds = ticket.getImages().stream()
                 .map(TicketImage::getId)
                 .toList();
+        TicketAssignment assignment = ticket.getActiveAssignment();
 
         return new TicketResponse(
                 ticket.getId(),
@@ -179,10 +284,41 @@ public class TicketController {
                 ticket.getCategory(),
                 ticket.getLocation(),
                 ticket.getUrgency(),
+                ticket.getOperationalPriority(),
+                assignment == null ? null : assignment.getTechnician().getId(),
+                assignment == null ? null : assignment.getTechnician().getName(),
+                assignment == null ? null : assignment.getTechnician().getEmail(),
+                assignment == null ? null : assignment.getAssignedAt(),
                 ticket.getStatus(),
                 ticket.getCreatedAt(),
                 ticket.getUpdatedAt(),
+                ticket.getSubmittedBy().getId(),
+                ticket.getSubmittedBy().getName(),
+                ticket.getSubmittedBy().getEmail(),
                 imageIds);
+    }
+
+    private CompletionEvidenceResponse createCompletionEvidenceResponse(CompletionEvidence evidence) {
+        return new CompletionEvidenceResponse(
+                evidence.getId(),
+                evidence.getTicket().getId(),
+                evidence.getRepairNotes(),
+                evidence.getUploadedBy().getId(),
+                evidence.getUploadedBy().getName(),
+                evidence.getUploadedAt());
+    }
+
+    private TicketHistoryResponse createHistoryResponse(TicketHistory history) {
+        return new TicketHistoryResponse(
+                history.getId(),
+                history.getTicketId(),
+                history.getEventType(),
+                history.getPreviousValue(),
+                history.getNewValue(),
+                history.getReason(),
+                history.getActor().getId(),
+                history.getActor().getName(),
+                history.getOccurredAt());
     }
 
     public record TicketResponse(
@@ -192,9 +328,44 @@ public class TicketController {
             TicketCategory category,
             String location,
             UrgencyLevel urgency,
+            TicketPriority operationalPriority,
+            Long assignedTechnicianId,
+            String assignedTechnicianName,
+            String assignedTechnicianEmail,
+            java.time.LocalDateTime assignedAt,
             TicketStatus status,
             java.time.LocalDateTime createdAt,
             java.time.LocalDateTime updatedAt,
+            Long submittedById,
+            String submittedByName,
+            String submittedByEmail,
             List<Long> imageIds) {
+    }
+
+    public record CompletionEvidenceResponse(
+            Long id,
+            Long ticketId,
+            String repairNotes,
+            Long uploadedById,
+            String uploadedByName,
+            java.time.LocalDateTime uploadedAt) {
+    }
+
+    public record TicketHistoryResponse(
+            Long id,
+            Long ticketId,
+            TicketEventType eventType,
+            String previousValue,
+            String newValue,
+            String reason,
+            Long actorId,
+            String actorName,
+            java.time.LocalDateTime occurredAt) {
+    }
+
+    public record TechnicianResponse(
+            Long id,
+            String name,
+            String email) {
     }
 }

@@ -1,5 +1,7 @@
 package com.campusfix.user;
 
+import java.util.Set;
+
 import java.io.IOException;
 
 import jakarta.servlet.http.HttpSession;
@@ -9,7 +11,6 @@ import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.CrossOrigin;
 import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -31,14 +32,16 @@ public class UserController {
     private static final long MAX_AVATAR_SIZE_BYTES = 15 * 1024 * 1024;
 
     private final UserService userService;
+    private final AccessControlService accessControlService;
 
-    public UserController(UserService userService) {
+    public UserController(UserService userService, AccessControlService accessControlService) {
         this.userService = userService;
+        this.accessControlService = accessControlService;
     }
 
     @GetMapping("/me")
     public ProfileResponse getMyProfile(HttpSession session) {
-        User user = userService.getProfile(getLoggedInUserId(session));
+        User user = accessControlService.requireAuthenticatedUser(session);
         return createProfileResponse(user);
     }
 
@@ -47,7 +50,7 @@ public class UserController {
             @Valid @RequestBody ProfileUpdateRequest request,
             HttpSession session) {
         User user = userService.updateProfile(
-                getLoggedInUserId(session),
+                accessControlService.requireAuthenticatedUser(session).getId(),
                 request.name(),
                 request.contactInformation(),
                 request.profileDetails());
@@ -63,7 +66,7 @@ public class UserController {
 
         try {
             userService.updateAvatar(
-                    getLoggedInUserId(session),
+                    accessControlService.requireAuthenticatedUser(session).getId(),
                     avatar.getBytes(),
                     avatar.getContentType());
         } catch (IOException exception) {
@@ -73,7 +76,7 @@ public class UserController {
 
     @GetMapping("/me/avatar")
     public ResponseEntity<byte[]> getMyAvatar(HttpSession session) {
-        User user = userService.getProfile(getLoggedInUserId(session));
+        User user = accessControlService.requireAuthenticatedUser(session);
 
         if (user.getAvatarData() == null || user.getAvatarContentType() == null) {
             throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Avatar not found");
@@ -82,17 +85,6 @@ public class UserController {
         return ResponseEntity.ok()
                 .contentType(MediaType.parseMediaType(user.getAvatarContentType()))
                 .body(user.getAvatarData());
-    }
-
-    @PutMapping("/{userId}/role")
-    public ProfileResponse updateUserRole(
-            @PathVariable Long userId,
-            @Valid @RequestBody RoleUpdateRequest request,
-            HttpSession session) {
-        requireAdministrator(session);
-
-        User user = userService.updateRole(userId, request.role());
-        return createProfileResponse(user);
     }
 
     private void validateAvatar(MultipartFile avatar) {
@@ -110,31 +102,14 @@ public class UserController {
         }
     }
 
-    private Long getLoggedInUserId(HttpSession session) {
-        Object userId = session.getAttribute("userId");
-
-        if (userId instanceof Long id) {
-            return id;
-        }
-
-        throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Login is required");
-    }
-
-    private void requireAdministrator(HttpSession session) {
-        Long userId = getLoggedInUserId(session);
-        User current = userService.getProfile(userId);
-
-        if (current.getRole() != Role.ADMINISTRATOR) {
-            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Administrator access required");
-        }
-    }
-
     private ProfileResponse createProfileResponse(User user) {
         return new ProfileResponse(
                 user.getId(),
                 user.getEmail(),
                 user.getName(),
+                user.getIdentityType(),
                 user.getRole(),
+                user.getRoles(),
                 user.getContactInformation(),
                 user.getProfileDetails());
     }
@@ -143,7 +118,9 @@ public class UserController {
             Long id,
             String email,
             String name,
+            IdentityType identityType,
             Role role,
+            Set<Role> roles,
             String contactInformation,
             String profileDetails) {
     }
