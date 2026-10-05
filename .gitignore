@@ -1,0 +1,11 @@
+.DS_Store
+Thumbs.db
+desktop.ini
+.env
+.env.*
+!.env.example
+*.db
+*.mv.db
+*.trace.db
+*.tmp
+
