@@ -3,50 +3,116 @@
   <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>User Administration | CampusFix</title>
+    <title>Manage Users | CampusFix</title>
     <link rel="stylesheet" href="./css/styles.css">
-    <link rel="stylesheet" href="./css/theme.css?v=20261005">
-    <script src="./js/background.js?v=20261005" defer></script>
+    <link rel="stylesheet" href="./css/theme.css?v=20261012">
   </head>
-  <body>
-    <main class="workspace-container" id="admin-page">
-      <header class="workspace-header">
-        <div>
-          <h1>CampusFix</h1>
-          <p>User Administration</p>
+  <body class="app-page" data-page="admin">
+    <a class="skip-link" href="#main-content">Skip to main content</a>
+
+    <div class="app-shell">
+      <aside id="app-sidebar" class="app-sidebar" aria-label="Primary navigation">
+        <a class="app-brand" href="./workspace.html" aria-label="CampusFix dashboard">
+          <span class="app-brand-mark" aria-hidden="true">CF</span>
+          <span class="app-brand-copy">
+            <strong>CampusFix</strong>
+            <small>Maintenance portal</small>
+          </span>
+        </a>
+
+        <nav class="app-nav" aria-label="Workspace">
+          <a class="app-nav-link" href="./workspace.html">
+            <span aria-hidden="true">⌂</span>
+            <span>Dashboard</span>
+          </a>
+          <a class="app-nav-link" href="./requests.html">
+            <span aria-hidden="true">▤</span>
+            <span>Requests</span>
+          </a>
+          <a id="new-request-nav" class="app-nav-link requester-only" href="./request-form.html" data-requires-role="GENERAL_USER" hidden>
+            <span aria-hidden="true">＋</span>
+            <span>New request</span>
+          </a>
+          <a id="admin-link" class="app-nav-link is-active" href="./admin.html" aria-current="page">
+            <span aria-hidden="true">♙</span>
+            <span>Manage users</span>
+          </a>
+          <a class="app-nav-link" href="./profile.html">
+            <span aria-hidden="true">○</span>
+            <span>Profile</span>
+          </a>
+        </nav>
+
+        <div class="app-sidebar-footer">
+          <div class="current-user">
+            <span class="current-user-label">Signed in as</span>
+            <span id="workspace-role" class="role-badge" hidden></span>
+          </div>
+          <button id="logout-button" class="app-nav-link logout-button" type="button">
+            <span aria-hidden="true">↪</span>
+            <span>Log out</span>
+          </button>
+          <p id="auth-message" class="app-status-message" role="status" aria-live="polite"></p>
         </div>
-        <div class="workspace-header-actions">
-          <span id="admin-role" class="role-badge role-administrator">Administrator</span>
-          <a class="workspace-profile-button" href="./profile.html">Profile</a>
-          <button id="logout-button" type="button" class="secondary-button">Logout</button>
-        </div>
-      </header>
+      </aside>
 
-      <section class="card">
-        <h2>Users and Roles</h2>
-        <p>Registration creates a Student Requester account. Use this table to update university identity and select one or more roles. Unchecking a role revokes that access.</p>
-        <p id="admin-message" role="status">Loading users...</p>
+      <button id="sidebar-backdrop" class="sidebar-backdrop" type="button" aria-label="Close navigation" tabindex="-1"></button>
 
-        <div class="table-scroll">
-          <table class="admin-table">
-            <thead>
-              <tr>
-                <th>ID</th>
-                <th>Name</th>
-                <th>Email</th>
-                <th>Identity</th>
-                <th>Roles</th>
-                <th>Save changes</th>
-              </tr>
-            </thead>
-            <tbody id="admin-users-body"></tbody>
-          </table>
-        </div>
-      </section>
+      <div class="app-frame">
+        <header class="app-topbar">
+          <button id="sidebar-toggle" class="app-menu-button" type="button" aria-controls="app-sidebar" aria-expanded="false" aria-label="Open navigation">
+            <span aria-hidden="true">☰</span>
+          </button>
+          <div class="app-topbar-context">
+            <span>Administration</span>
+            <strong>Manage users</strong>
+          </div>
+          <a class="topbar-profile-link" href="./profile.html">View profile</a>
+        </header>
 
-      <p id="auth-message" role="status"></p>
-    </main>
+        <main id="main-content" class="app-content">
+          <section id="admin-page" aria-labelledby="admin-title">
+            <header class="page-header">
+              <div class="page-heading">
+                <p class="page-eyebrow">Administration</p>
+                <h1 id="admin-title">Users and roles</h1>
+                <p class="page-description">Manage university identities and control which areas each person can access.</p>
+              </div>
+              <span id="admin-role" class="role-badge role-administrator">Administrator</span>
+            </header>
 
-    <script src="./js/app.js"></script>
+            <section class="surface admin-users-section" aria-labelledby="admin-users-title">
+              <header class="surface-header">
+                <div class="surface-heading">
+                  <h2 id="admin-users-title">User access</h2>
+                  <p>New registrations start as Student Requesters. Select at least one role for every account.</p>
+                </div>
+              </header>
+
+              <p id="admin-message" class="app-status-message" role="status" aria-live="polite">Loading users…</p>
+
+              <div class="table-scroll" tabindex="0" aria-label="Scrollable user access table">
+                <table class="admin-table">
+                  <caption class="visually-hidden">Registered users, their university identity, roles, and access controls</caption>
+                  <thead>
+                    <tr>
+                      <th scope="col">ID</th>
+                      <th scope="col">Name</th>
+                      <th scope="col">Email</th>
+                      <th scope="col">Identity</th>
+                      <th scope="col">Roles</th>
+                      <th scope="col"><span class="visually-hidden">Actions</span></th>
+                    </tr>
+                  </thead>
+                  <tbody id="admin-users-body"></tbody>
+                </table>
+              </div>
+            </section>
+          </section>
+        </main>
+      </div>
+    </div>
+
+    <script src="./js/app.js?v=20261012"></script>
   </body>
 </html>
