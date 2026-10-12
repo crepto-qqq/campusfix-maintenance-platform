@@ -3,94 +3,125 @@
   <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Workspace | CampusFix</title>
+    <title>Dashboard | CampusFix</title>
     <link rel="stylesheet" href="./css/styles.css">
-    <link rel="stylesheet" href="./css/theme.css?v=20261005">
-    <script src="./js/background.js?v=20261005" defer></script>
+    <link rel="stylesheet" href="./css/theme.css?v=20261012">
   </head>
-  <body>
-    <main class="workspace-container">
-      <header class="workspace-header">
-        <h1>CampusFix</h1>
-        <div class="workspace-header-actions">
-          <span id="workspace-role" class="role-badge" hidden></span>
-          <a id="admin-link" class="workspace-profile-button" href="./admin.html" hidden>Manage Users</a>
-          <a class="workspace-profile-button" href="./profile.html">Profile</a>
-        </div>
-      </header>
+  <body class="app-page" data-page="dashboard">
+    <a class="skip-link" href="#main-content">Skip to main content</a>
 
-      <section id="role-workspace-message" class="card" hidden>
-        <h2 id="role-workspace-title">Role Workspace</h2>
-        <p id="role-workspace-description"></p>
-      </section>
+    <div class="app-shell">
+      <aside id="app-sidebar" class="app-sidebar" aria-label="Primary navigation">
+        <a class="app-brand" href="./workspace.html" aria-label="CampusFix dashboard">
+          <span class="app-brand-mark" aria-hidden="true">CF</span>
+          <span class="app-brand-copy">
+            <strong>CampusFix</strong>
+            <small>Maintenance portal</small>
+          </span>
+        </a>
 
-      <section id="request-form-section" class="card requester-content">
-        <h2 id="request-form-title">Submit Maintenance Request</h2>
+        <nav class="app-nav" aria-label="Workspace">
+          <a class="app-nav-link is-active" href="./workspace.html" aria-current="page">
+            <span aria-hidden="true">⌂</span>
+            <span>Dashboard</span>
+          </a>
+          <a class="app-nav-link" href="./requests.html">
+            <span aria-hidden="true">▤</span>
+            <span>Requests</span>
+          </a>
+          <a id="new-request-nav" class="app-nav-link requester-only" href="./request-form.html" data-requires-role="GENERAL_USER" hidden>
+            <span aria-hidden="true">＋</span>
+            <span>New request</span>
+          </a>
+          <a id="admin-link" class="app-nav-link" href="./admin.html" hidden>
+            <span aria-hidden="true">♙</span>
+            <span>Manage users</span>
+          </a>
+          <a class="app-nav-link" href="./profile.html">
+            <span aria-hidden="true">○</span>
+            <span>Profile</span>
+          </a>
+        </nav>
 
-        <form id="ticket-form">
-          <label for="ticket-title">Issue Title</label>
-          <input id="ticket-title" name="title" type="text" maxlength="150" required>
-
-          <label for="ticket-description">Description</label>
-          <textarea id="ticket-description" name="description" rows="5" maxlength="4000" required></textarea>
-
-          <label for="ticket-category">Maintenance Category</label>
-          <select id="ticket-category" name="category" required>
-            <option value="ELECTRICAL">Electrical</option>
-            <option value="PLUMBING">Plumbing</option>
-            <option value="HVAC">Heating / Air Conditioning</option>
-            <option value="CARPENTRY">Carpentry</option>
-            <option value="CLEANING">Cleaning</option>
-            <option value="IT">IT</option>
-            <option value="GROUNDS">Grounds</option>
-            <option value="OTHER">Other</option>
-          </select>
-
-          <label for="ticket-location">Location</label>
-          <input id="ticket-location" name="location" type="text" maxlength="255" required>
-
-          <label for="ticket-urgency">Urgency Level</label>
-          <select id="ticket-urgency" name="urgency" required>
-            <option value="LOW">Low</option>
-            <option value="MEDIUM">Medium</option>
-            <option value="HIGH">High</option>
-            <option value="EMERGENCY">Emergency</option>
-          </select>
-
-          <label for="ticket-images">Issue Images (optional, up to 5)</label>
-          <input id="ticket-images" name="images" type="file" accept="image/*" multiple>
-
-          <div id="ticket-form-actions">
-            <button type="submit" id="ticket-submit-button">Submit Request</button>
-            <button type="button" id="ticket-reset-button" class="secondary-button" hidden>Cancel Edit</button>
+        <div class="app-sidebar-footer">
+          <div class="current-user">
+            <span class="current-user-label">Signed in as</span>
+            <span id="workspace-role" class="role-badge" hidden></span>
           </div>
-
-          <input id="ticket-id" type="hidden">
-          <p id="ticket-message" role="status"></p>
-        </form>
-      </section>
-
-      <section class="card requester-content">
-        <h2>My Maintenance Requests</h2>
-        <div id="tickets-list" class="tickets-list">
-          <p id="tickets-message" role="status">Loading requests...</p>
+          <button id="logout-button" class="app-nav-link logout-button" type="button">
+            <span aria-hidden="true">↪</span>
+            <span>Log out</span>
+          </button>
+          <p id="auth-message" class="app-status-message" role="status" aria-live="polite"></p>
         </div>
-      </section>
+      </aside>
 
-      <section id="all-requests-section" class="card" hidden>
-        <h2 id="all-requests-title">All Maintenance Requests</h2>
-        <p id="all-requests-description">Overview of requests submitted by all users.</p>
-        <section id="priority-summary" class="priority-summary" aria-labelledby="priority-summary-title" hidden>
-          <h3 id="priority-summary-title">Priority Distribution</h3>
-          <div id="priority-summary-values" class="priority-summary-values"></div>
-          <p id="priority-summary-message" role="status"></p>
-        </section>
-        <div id="all-tickets-list" class="tickets-list">
-          <p id="all-tickets-message" role="status">Loading requests...</p>
-        </div>
-      </section>
-    </main>
+      <button id="sidebar-backdrop" class="sidebar-backdrop" type="button" aria-label="Close navigation" tabindex="-1"></button>
 
-    <script src="./js/app.js"></script>
+      <div class="app-frame">
+        <header class="app-topbar">
+          <button id="sidebar-toggle" class="app-menu-button" type="button" aria-controls="app-sidebar" aria-expanded="false" aria-label="Open navigation">
+            <span aria-hidden="true">☰</span>
+          </button>
+          <div class="app-topbar-context">
+            <span>Campus maintenance</span>
+            <strong>Dashboard</strong>
+          </div>
+          <a class="topbar-profile-link" href="./profile.html">View profile</a>
+        </header>
+
+        <main id="main-content" class="app-content">
+          <section id="workspace-page" aria-labelledby="dashboard-title">
+            <header class="page-header">
+              <div class="page-heading">
+                <p class="page-eyebrow">Workspace overview</p>
+                <h1 id="dashboard-title">Dashboard</h1>
+                <p id="dashboard-description" class="page-description">See what needs your attention and move maintenance work forward.</p>
+              </div>
+              <div class="page-actions">
+                <a id="dashboard-new-request" class="button primary-button requester-only" href="./request-form.html" data-requires-role="GENERAL_USER" hidden>New request</a>
+              </div>
+            </header>
+
+            <p id="dashboard-message" class="app-status-message" role="status" aria-live="polite">Loading your workspace…</p>
+
+            <section class="dashboard-summary" aria-labelledby="dashboard-summary-title">
+              <div class="section-heading">
+                <div>
+                  <p class="section-eyebrow">At a glance</p>
+                  <h2 id="dashboard-summary-title">Your work summary</h2>
+                </div>
+              </div>
+              <div id="dashboard-metrics" class="stat-grid" aria-live="polite">
+                <div class="stat-card stat-card-skeleton" aria-hidden="true"></div>
+                <div class="stat-card stat-card-skeleton" aria-hidden="true"></div>
+                <div class="stat-card stat-card-skeleton" aria-hidden="true"></div>
+                <div class="stat-card stat-card-skeleton" aria-hidden="true"></div>
+              </div>
+            </section>
+
+            <section class="surface attention-section" aria-labelledby="dashboard-focus-title">
+              <header class="surface-header">
+                <div class="surface-heading">
+                  <p class="section-eyebrow">Next up</p>
+                  <h2 id="dashboard-focus-title">Requests needing attention</h2>
+                  <p id="dashboard-focus-description">Your five most important active requests.</p>
+                </div>
+                <a class="text-link" href="./requests.html">View all requests <span aria-hidden="true">→</span></a>
+              </header>
+
+              <div id="dashboard-tickets" class="request-list" aria-live="polite">
+                <div class="loading-state">
+                  <span class="loading-indicator" aria-hidden="true"></span>
+                  <p>Loading requests…</p>
+                </div>
+              </div>
+            </section>
+          </section>
+        </main>
+      </div>
+    </div>
+
+    <script src="./js/app.js?v=20261012"></script>
   </body>
 </html>

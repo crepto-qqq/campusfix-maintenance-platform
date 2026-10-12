@@ -1,0 +1,148 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Requests | CampusFix</title>
+    <link rel="stylesheet" href="./css/styles.css">
+    <link rel="stylesheet" href="./css/theme.css?v=20261012">
+  </head>
+  <body class="app-page" data-page="requests">
+    <a class="skip-link" href="#main-content">Skip to main content</a>
+
+    <div class="app-shell">
+      <aside id="app-sidebar" class="app-sidebar" aria-label="Primary navigation">
+        <a class="app-brand" href="./workspace.html" aria-label="CampusFix dashboard">
+          <span class="app-brand-mark" aria-hidden="true">CF</span>
+          <span class="app-brand-copy">
+            <strong>CampusFix</strong>
+            <small>Maintenance portal</small>
+          </span>
+        </a>
+
+        <nav class="app-nav" aria-label="Workspace">
+          <a class="app-nav-link" href="./workspace.html">
+            <span aria-hidden="true">⌂</span>
+            <span>Dashboard</span>
+          </a>
+          <a class="app-nav-link is-active" href="./requests.html" aria-current="page">
+            <span aria-hidden="true">▤</span>
+            <span>Requests</span>
+          </a>
+          <a id="new-request-nav" class="app-nav-link requester-only" href="./request-form.html" data-requires-role="GENERAL_USER" hidden>
+            <span aria-hidden="true">＋</span>
+            <span>New request</span>
+          </a>
+          <a id="admin-link" class="app-nav-link" href="./admin.html" hidden>
+            <span aria-hidden="true">♙</span>
+            <span>Manage users</span>
+          </a>
+          <a class="app-nav-link" href="./profile.html">
+            <span aria-hidden="true">○</span>
+            <span>Profile</span>
+          </a>
+        </nav>
+
+        <div class="app-sidebar-footer">
+          <div class="current-user">
+            <span class="current-user-label">Signed in as</span>
+            <span id="workspace-role" class="role-badge" hidden></span>
+          </div>
+          <button id="logout-button" class="app-nav-link logout-button" type="button">
+            <span aria-hidden="true">↪</span>
+            <span>Log out</span>
+          </button>
+          <p id="auth-message" class="app-status-message" role="status" aria-live="polite"></p>
+        </div>
+      </aside>
+
+      <button id="sidebar-backdrop" class="sidebar-backdrop" type="button" aria-label="Close navigation" tabindex="-1"></button>
+
+      <div class="app-frame">
+        <header class="app-topbar">
+          <button id="sidebar-toggle" class="app-menu-button" type="button" aria-controls="app-sidebar" aria-expanded="false" aria-label="Open navigation">
+            <span aria-hidden="true">☰</span>
+          </button>
+          <div class="app-topbar-context">
+            <span>Campus maintenance</span>
+            <strong>Requests</strong>
+          </div>
+          <a class="topbar-profile-link" href="./profile.html">View profile</a>
+        </header>
+
+        <main id="main-content" class="app-content">
+          <section id="requests-page" aria-labelledby="requests-title">
+            <header class="page-header">
+              <div class="page-heading">
+                <p class="page-eyebrow">Maintenance queue</p>
+                <h1 id="requests-title">Requests</h1>
+                <p id="requests-description" class="page-description">Find a request, check its progress, or open it to see the full details.</p>
+              </div>
+              <div class="page-actions">
+                <a id="requests-new-request" class="button primary-button requester-only" href="./request-form.html" data-requires-role="GENERAL_USER" hidden>New request</a>
+              </div>
+            </header>
+
+            <form id="request-controls" class="surface filter-bar" role="search">
+              <div class="search-field">
+                <label for="requests-search">Search requests</label>
+                <div class="search-input-wrap">
+                  <span aria-hidden="true">⌕</span>
+                  <input id="requests-search" name="search" type="search" autocomplete="off" placeholder="Search by title">
+                </div>
+              </div>
+
+              <div class="filter-field">
+                <label for="requests-status">Status</label>
+                <select id="requests-status" name="status">
+                  <option value="ALL">All statuses</option>
+                  <option value="ATTENTION">Needs attention</option>
+                  <option value="ACTIVE">Active</option>
+                  <option value="UNASSIGNED">Unassigned</option>
+                  <option value="ASSIGNED">Assigned</option>
+                  <option value="IN_PROGRESS">In progress</option>
+                  <option value="COMPLETED">Completed</option>
+                  <option value="CANCELLED">Cancelled</option>
+                  <option value="CLOSED">Closed</option>
+                  <option value="REOPENED">Reopened</option>
+                </select>
+              </div>
+
+              <div class="filter-field">
+                <label for="requests-sort">Sort by</label>
+                <select id="requests-sort" name="sort">
+                  <option value="attention">Needs attention</option>
+                  <option value="newest">Newest first</option>
+                  <option value="oldest">Oldest first</option>
+                  <option value="priority">Highest priority</option>
+                  <option value="status">Status</option>
+                </select>
+              </div>
+
+              <button id="requests-reset" class="button tertiary-button filter-reset" type="reset">Clear filters</button>
+            </form>
+
+            <section class="surface request-results" aria-labelledby="request-results-title">
+              <header class="surface-header request-results-header">
+                <div class="surface-heading">
+                  <h2 id="request-results-title">All requests</h2>
+                  <p id="requests-count" aria-live="polite">Loading…</p>
+                </div>
+              </header>
+
+              <p id="requests-message" class="app-status-message" role="status" aria-live="polite"></p>
+              <div id="requests-list" class="request-list" aria-live="polite">
+                <div class="loading-state">
+                  <span class="loading-indicator" aria-hidden="true"></span>
+                  <p>Loading requests…</p>
+                </div>
+              </div>
+            </section>
+          </section>
+        </main>
+      </div>
+    </div>
+
+    <script src="./js/app.js?v=20261012"></script>
+  </body>
+</html>

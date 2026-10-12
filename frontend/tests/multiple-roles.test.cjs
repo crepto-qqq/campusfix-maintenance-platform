@@ -25,6 +25,26 @@ function page() {
   return { context, elements, requesterSections, run: code => vm.runInContext(code, context) };
 }
 
+function richElement(initial = {}) {
+  const classes = new Set();
+  return {
+    hidden: false,
+    textContent: '',
+    innerHTML: '',
+    dataset: {},
+    children: [],
+    attributes: {},
+    classList: {
+      add: (...names) => names.forEach(name => classes.add(name)),
+      remove: (...names) => names.forEach(name => classes.delete(name)),
+      contains: name => classes.has(name)
+    },
+    appendChild(child) { this.children.push(child); },
+    setAttribute(name, value) { this.attributes[name] = String(value); },
+    ...initial
+  };
+}
+
 test('requester + technician sees both work areas and only their tickets in each area', async () => {
   const p = page();
   p.context.testUser = { id: 10, role: 'MAINTENANCE_STAFF', roles: ['GENERAL_USER', 'MAINTENANCE_STAFF'] };
@@ -153,4 +173,125 @@ test('reassignment requires both a different technician and a reason before call
   await p.run('reassignTicket(7, select, reasonInput, message, button)');
   assert.match(p.context.message.textContent, /reason/);
   assert.equal(p.context.fetchCalled, undefined);
+});
+
+test('completed and closed remain independent status filters and dashboard counts', () => {
+  const p = page();
+  assert.equal(p.run("matchesStatusFilter({status: 'COMPLETED'}, 'COMPLETED')"), true);
+  assert.equal(p.run("matchesStatusFilter({status: 'CLOSED'}, 'COMPLETED')"), false);
+  assert.equal(p.run("matchesStatusFilter({status: 'CLOSED'}, 'CLOSED')"), true);
+
+  p.context.manager = { roles: ['MANAGER'] };
+  p.context.finishedTickets = [{ status: 'COMPLETED' }, { status: 'CLOSED' }];
+  const metrics = p.run('dashboardMetricsFor(manager, finishedTickets)');
+  assert.equal(metrics.at(-1)[0], 'Completed');
+  assert.equal(metrics.at(-1)[1], 1);
+});
+
+test('requester attention order follows visible suggested urgency', () => {
+  const p = page();
+  p.context.requester = { id: 7, roles: ['GENERAL_USER'] };
+  p.context.attentionTickets = [
+    {
+      id: 1, status: 'IN_PROGRESS', urgency: 'LOW', operationalPriority: 'CRITICAL',
+      createdAt: '2026-10-12T10:00:00'
+    },
+    {
+      id: 2, status: 'IN_PROGRESS', urgency: 'EMERGENCY', operationalPriority: 'LOW',
+      createdAt: '2026-10-12T09:00:00'
+    }
+  ];
+  const orderedIds = p.run('focusTicketsFor(requester, attentionTickets).map(ticket => ticket.id)');
+  assert.deepEqual(Array.from(orderedIds), [2, 1]);
+});
+
+test('detail renders when optional evidence and technician requests fail', async () => {
+  const p = page();
+  p.elements['request-detail-message'] = richElement();
+  p.elements['request-detail-content'] = richElement({ hidden: true });
+  p.context.admin = { id: 1, roles: ['ADMINISTRATOR'] };
+  p.run(`
+    currentWorkspaceUser = admin;
+    availableTechnicians = [];
+    getTicketIdFromUrl = () => 7;
+    fetchJson = async path => {
+      if (path === '/tickets/7') return { id: 7, title: 'Leaking pipe', status: 'SUBMITTED' };
+      throw new Error(path.includes('completion-evidence') ? 'Evidence unavailable' : 'Technicians unavailable');
+    };
+    renderRequestDetail = (ticket, evidence) => {
+      renderedTicketId = ticket.id;
+      renderedEvidence = evidence;
+    };
+  `);
+
+  await p.run('loadRequestDetail()');
+  assert.equal(p.context.renderedTicketId, 7);
+  assert.deepEqual(Array.from(p.context.renderedEvidence), []);
+  assert.match(p.elements['request-detail-message'].textContent, /supporting information is unavailable/i);
+  assert.equal(p.elements['request-detail-message'].classList.contains('error-state'), false);
+});
+
+test('complete request uploads optional evidence before one completed transition', async () => {
+  const p = page();
+  p.context.notes = { value: '  Replaced the damaged valve  ' };
+  p.context.image = { value: 'selected', files: [{ type: 'image/png', size: 1024 }] };
+  p.context.message = { textContent: '' };
+  p.context.button = { disabled: false };
+  p.run(`
+    completionSteps = [];
+    postCompletionEvidence = async (_ticketId, evidence) => {
+      completionSteps.push('evidence:' + evidence.notes);
+    };
+    fetchJson = async (_path, _fallback, options) => {
+      completionSteps.push('status:' + JSON.parse(options.body).status);
+      return {};
+    };
+    refreshTicketLists = async () => { completionSteps.push('refresh'); };
+  `);
+
+  await p.run('completeRequest(7, notes, image, message, button)');
+  assert.deepEqual(Array.from(p.context.completionSteps), [
+    'evidence:Replaced the damaged valve',
+    'status:COMPLETED',
+    'refresh'
+  ]);
+  assert.equal(p.context.notes.value, '');
+  assert.equal(p.context.image.value, '');
+});
+
+test('complete request rejects half-filled optional evidence without changing status', async () => {
+  const p = page();
+  p.context.notes = { value: 'Notes without a photo' };
+  p.context.image = { value: '', files: [] };
+  p.context.message = { textContent: '' };
+  p.context.button = { disabled: false };
+  p.run('fetchJson = async () => { statusChanged = true; };');
+
+  await p.run('completeRequest(7, notes, image, message, button)');
+  assert.match(p.context.message.textContent, /both repair notes and an evidence image/i);
+  assert.equal(p.context.statusChanged, undefined);
+  assert.equal(p.context.button.disabled, false);
+});
+
+test('dashboard and request failures clear loading placeholders', async () => {
+  const p = page();
+  p.elements['dashboard-message'] = richElement();
+  p.elements['dashboard-tickets'] = richElement({ innerHTML: 'Loading requests' });
+  p.elements['dashboard-metrics'] = richElement({ innerHTML: 'Skeleton cards' });
+  p.elements['requests-message'] = richElement();
+  p.elements['requests-list'] = richElement({ innerHTML: 'Loading requests' });
+  p.elements['requests-count'] = richElement({ textContent: 'Loading…' });
+  p.context.user = { id: 1, roles: ['MANAGER'] };
+  p.run('getVisibleTickets = async () => { throw new Error("Network unavailable"); };');
+
+  await p.run('loadDashboardData(user)');
+  assert.equal(p.elements['dashboard-tickets'].innerHTML, '');
+  assert.equal(p.elements['dashboard-metrics'].innerHTML, '');
+  assert.equal(p.elements['dashboard-tickets'].attributes['aria-busy'], 'false');
+  assert.equal(p.elements['dashboard-metrics'].attributes['aria-busy'], 'false');
+
+  await p.run('loadRequestsPageData()');
+  assert.equal(p.elements['requests-list'].innerHTML, '');
+  assert.equal(p.elements['requests-count'].textContent, 'Unable to load requests');
+  assert.equal(p.elements['requests-list'].attributes['aria-busy'], 'false');
 });
