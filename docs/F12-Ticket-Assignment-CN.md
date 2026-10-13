@@ -61,6 +61,7 @@ Content-Type: application/json
 
 - Administrator在`SUBMITTED + Unassigned`工单中看到Assign Technician控件。
 - 下拉列表只显示有效Maintenance Staff。
+- 派单界面右侧展示维修人员候选列表：先列当前无未完成派工者，再列仍有未完成派工者；组内按考虑样本数的评分综合分排序，并显示真实平均分、评价数和未完成派工数。管理员可查看评价详情，最终仍由管理员手动选择，也可分派给忙碌人员。“无未完成派工”不代表实时在岗。评分及审核规则见 [维修人员评分、评价与审核](Technician-Ratings-Reviews-CN.md)。
 - 成功后卡片立即显示`ASSIGNED`、负责人和Assigned Time，初次分派按钮消失。
 - Maintenance Staff进入`My Assigned Requests`，只看到当前分配给自己的工单。
 - Requester可在自己的工单中查看分派结果，但没有分派控件。

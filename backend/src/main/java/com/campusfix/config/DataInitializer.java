@@ -61,6 +61,7 @@ public class DataInitializer implements CommandLineRunner {
     @Override
     @Transactional
     public void run(String... args) {
+        allowNotificationsWithoutTicket();
         seedSystemRoles();
         migrateLegacyUserTable();
         enforceAccountConstraints();
@@ -69,6 +70,11 @@ public class DataInitializer implements CommandLineRunner {
         ensureAdministrator();
         migrateTicketStatuses();
         backfillTicketHistory();
+    }
+
+    /** Account-level review bans and unbans have no related maintenance ticket. */
+    private void allowNotificationsWithoutTicket() {
+        jdbcTemplate.execute("ALTER TABLE in_app_notifications ALTER COLUMN ticket_id DROP NOT NULL");
     }
 
     private void seedSystemRoles() {

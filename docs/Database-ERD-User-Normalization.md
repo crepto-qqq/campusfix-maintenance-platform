@@ -24,6 +24,13 @@ erDiagram
     TICKETS ||--o{ IN_APP_NOTIFICATIONS : relates_to
     APP_USERS ||--o{ IN_APP_NOTIFICATIONS : receives
     APP_USERS ||--o{ IN_APP_NOTIFICATIONS : triggers
+    TICKETS ||--o| TECHNICIAN_REVIEWS : receives
+    APP_USERS ||--o{ TECHNICIAN_REVIEWS : authors
+    APP_USERS ||--o{ TECHNICIAN_REVIEWS : rated_technician
+    TECHNICIAN_REVIEWS ||--o{ REVIEW_REPORTS : reported_in
+    APP_USERS ||--o{ REVIEW_REPORTS : reports
+    TECHNICIAN_REVIEWS ||--o{ REVIEW_AUDIT : audited_in
+    APP_USERS ||--o{ REVIEW_BANS : restricted_by
 
     APP_USERS {
         bigint id PK
@@ -104,12 +111,64 @@ erDiagram
         bigint id PK
         bigint recipient_id FK
         bigint actor_id FK
-        bigint ticket_id FK
+        bigint ticket_id FK "nullable for account-level notices"
         enum type
         varchar message
         varchar deduplication_key UK
         timestamp created_at
         timestamp read_at
+    }
+
+    TECHNICIAN_REVIEWS {
+        bigint id PK
+        bigint ticket_id FK,UK
+        bigint technician_id FK
+        bigint author_id FK
+        int score
+        varchar comment
+        enum visibility
+        timestamp created_at
+        timestamp updated_at
+    }
+
+    REVIEW_REPORTS {
+        bigint id PK
+        bigint review_id FK
+        bigint reporter_id FK
+        varchar reason
+        enum status
+        varchar pending_key UK
+        varchar resolution_action
+        varchar resolution_reason
+        bigint resolved_by FK
+        timestamp created_at
+        timestamp resolved_at
+    }
+
+    REVIEW_BANS {
+        bigint id PK
+        bigint student_id FK
+        bigint administrator_id FK
+        varchar reason
+        timestamp expires_at
+        boolean active
+        timestamp created_at
+        timestamp ended_at
+        varchar end_reason
+        bigint ended_by FK
+    }
+
+    REVIEW_AUDIT {
+        bigint id PK
+        bigint review_id FK
+        bigint actor_id FK
+        varchar action
+        varchar reason
+        int before_score
+        int after_score
+        varchar before_visibility
+        varchar after_visibility
+        timestamp occurred_at
     }
 ```
 
@@ -123,7 +182,11 @@ erDiagram
 | `system_roles` | Authorisation role catalogue |
 | `user_role_assignments` | Current and historical role allocation, including administrator and time |
 | `ticket_assignments` | Current and historical Technician allocation, including assigning Administrator and time |
-| `in_app_notifications` | Durable, deduplicated business events for the future F17 notification centre |
+| `in_app_notifications` | Durable, deduplicated business events and student notification centre; `ticket_id` may be absent for account-level review bans |
+| `technician_reviews` | One current review per completed ticket, linked to its author and final technician; visibility supports text-only or full removal |
+| `review_reports` | Student reports and their resolution, with a unique pending key per reporter and review |
+| `review_bans` | Time-limited or permanent review submission bans with administrator action history |
+| `review_audit` | Before/after snapshots for rating changes, moderation and restoration |
 
 ## Compatibility and Data Integrity
 
@@ -135,6 +198,7 @@ erDiagram
 - Profile, Avatar, Request and History APIs retain their existing request and response contracts.
 - `tickets.operational_priority`独立于Requester填写的`urgency`，允许`NULL`表示尚未由Administrator分级，并建立`idx_tickets_operational_priority`索引。
 - 初次分派使用独立`ticket_assignments`关系表；工单状态、Assignment、History和Notification在同一事务中保存。
+- 评分汇总仅包含未被完整撤下的评价；只撤下评论时评分仍然有效。公开视图不返回作者或工单的身份字段。
 
 ## Legacy Migration
 

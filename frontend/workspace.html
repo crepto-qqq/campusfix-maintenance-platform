@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Dashboard | CampusFix</title>
     <link rel="stylesheet" href="./css/styles.css">
-    <link rel="stylesheet" href="./css/theme.css?v=20261014">
+    <link rel="stylesheet" href="./css/theme.css?v=20261014-reviews">
   </head>
   <body class="app-page" data-page="dashboard">
     <a class="skip-link" href="#main-content">Skip to main content</a>
@@ -105,6 +105,24 @@
               </div>
             </section>
 
+            <section id="technician-rating-section" class="surface technician-rating-section" aria-labelledby="technician-rating-title" hidden>
+              <header class="surface-header">
+                <div class="surface-heading">
+                  <p class="section-eyebrow">Your service</p>
+                  <h2 id="technician-rating-title">Your average rating</h2>
+                </div>
+              </header>
+              <p id="technician-rating-summary" class="rating-average" role="status" aria-live="polite"></p>
+            </section>
+
+            <section id="student-reviews-entry" class="surface review-directory-entry" data-requires-role="GENERAL_USER" aria-labelledby="student-reviews-title" hidden>
+              <div class="surface-header">
+                <div class="surface-heading"><p class="section-eyebrow">Service quality</p><h2 id="student-reviews-title">Technician reviews</h2>
+                  <p>See anonymous ratings and published comments from other students.</p></div>
+                <a class="text-link" href="./reviews.html">Browse reviews <span aria-hidden="true">→</span></a>
+              </div>
+            </section>
+
             <section class="surface attention-section" aria-labelledby="dashboard-focus-title">
               <header class="surface-header">
                 <div class="surface-heading">
@@ -127,6 +145,6 @@
       </div>
     </div>
 
-    <script src="./js/app.js?v=20261014"></script>
+    <script src="./js/app.js?v=20261014-reviews"></script>
   </body>
 </html>

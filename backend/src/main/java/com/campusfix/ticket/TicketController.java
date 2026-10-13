@@ -77,7 +77,10 @@ public class TicketController {
     public List<TechnicianResponse> getAssignableTechnicians(HttpSession session) {
         User administrator = accessControlService.requireRole(session, Role.ADMINISTRATOR);
         return ticketService.getAssignableTechnicians(administrator).stream()
-                .map(user -> new TechnicianResponse(user.getId(), user.getName(), user.getEmail()))
+                .map(candidate -> new TechnicianResponse(candidate.user().getId(),
+                        candidate.user().getName(), candidate.user().getEmail(),
+                        candidate.averageRating(), candidate.ratingCount(), candidate.rankingScore(),
+                        candidate.openAssignmentCount(), candidate.available()))
                 .toList();
     }
 
@@ -374,6 +377,11 @@ public class TicketController {
     public record TechnicianResponse(
             Long id,
             String name,
-            String email) {
+            String email,
+            Double averageRating,
+            long ratingCount,
+            double rankingScore,
+            long openAssignmentCount,
+            boolean available) {
     }
 }

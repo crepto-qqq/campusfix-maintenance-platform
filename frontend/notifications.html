@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Notifications | CampusFix</title>
+    <link rel="stylesheet" href="./css/styles.css">
+    <link rel="stylesheet" href="./css/theme.css?v=20261014-reviews">
+  </head>
+  <body class="app-page" data-page="notifications">
+    <a class="skip-link" href="#main-content">Skip to main content</a>
+    <div class="app-shell">
+      <aside id="app-sidebar" class="app-sidebar" aria-label="Primary navigation">
+        <a class="app-brand" href="./workspace.html" aria-label="CampusFix dashboard">
+          <span class="app-brand-mark" aria-hidden="true">CF</span>
+          <span class="app-brand-copy"><strong>CampusFix</strong><small>Maintenance portal</small></span>
+        </a>
+        <nav class="app-nav" aria-label="Workspace">
+          <a class="app-nav-link" href="./workspace.html"><span aria-hidden="true">⌂</span><span>Dashboard</span></a>
+          <a class="app-nav-link" href="./requests.html"><span aria-hidden="true">▤</span><span>Requests</span></a>
+          <a id="new-request-nav" class="app-nav-link requester-only" href="./request-form.html" data-requires-role="GENERAL_USER" hidden><span aria-hidden="true">＋</span><span>New request</span></a>
+          <a id="admin-link" class="app-nav-link" href="./admin.html" hidden><span aria-hidden="true">♙</span><span>Manage users</span></a>
+          <a class="app-nav-link" href="./profile.html"><span aria-hidden="true">○</span><span>Profile</span></a>
+        </nav>
+        <div class="app-sidebar-footer">
+          <div class="current-user"><span class="current-user-label">Signed in as</span><span id="workspace-role" class="role-badge" hidden></span></div>
+          <button id="logout-button" class="app-nav-link logout-button" type="button"><span aria-hidden="true">↪</span><span>Log out</span></button>
+          <p id="auth-message" class="app-status-message" role="status" aria-live="polite"></p>
+        </div>
+      </aside>
+      <button id="sidebar-backdrop" class="sidebar-backdrop" type="button" aria-label="Close navigation" tabindex="-1"></button>
+      <div class="app-frame">
+        <header class="app-topbar">
+          <button id="sidebar-toggle" class="app-menu-button" type="button" aria-controls="app-sidebar" aria-expanded="false" aria-label="Open navigation"><span aria-hidden="true">☰</span></button>
+          <div class="app-topbar-context"><span>Your updates</span><strong>Notifications</strong></div>
+          <a class="topbar-profile-link" href="./profile.html">View profile</a>
+        </header>
+        <main id="main-content" class="app-content" hidden>
+          <header class="page-header"><div class="page-heading"><p class="page-eyebrow">Inbox</p><h1>Notifications</h1>
+            <p class="page-description">Updates about your requests and rating activity.</p></div></header>
+          <p id="notifications-message" class="app-status-message" role="status" aria-live="polite">Loading notifications...</p>
+          <div id="notifications-list" class="notification-list" aria-live="polite"></div>
+        </main>
+      </div>
+    </div>
+    <script src="./js/app.js?v=20261014-reviews"></script>
+  </body>
+</html>

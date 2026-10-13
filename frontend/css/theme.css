@@ -2804,6 +2804,58 @@ body.lightbox-open {
 
 /* Feedback and transitional states */
 
+.app-nav .nav-count {
+  margin-left: auto;
+  min-width: 1.4rem;
+  padding: 2px 5px;
+  border-radius: 999px;
+  color: #fff;
+  background: var(--app-primary);
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-align: center;
+}
+
+.technician-rating-section { margin-bottom: 24px; }
+.rating-average { margin: 0; color: var(--app-primary); font-size: 1.55rem; font-weight: 750; }
+.review-directory, .notification-list { display: grid; gap: 18px; }
+.review-section { margin-bottom: 20px; }
+.review-list { display: grid; gap: 14px; }
+.review-entry, .notification-entry {
+  padding: 16px 0;
+  border-top: 1px solid var(--app-border);
+}
+.review-entry:first-child { border-top: 0; }
+.review-entry-heading { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; }
+.review-entry-heading time { margin-left: auto; color: var(--app-muted); font-size: 0.8rem; }
+.review-comment { white-space: pre-wrap; overflow-wrap: anywhere; }
+.review-report-snapshot, .review-report-current { margin: 10px 0; padding: 10px 12px; border-radius: 9px; background: var(--app-surface-subtle); }
+.review-report-snapshot { border-left: 3px solid var(--app-primary); }
+.review-report-current { border-left: 3px solid var(--app-border-strong); }
+.review-report-snapshot p, .review-report-current p { margin: 6px 0 0; }
+.review-report { margin-top: 10px; }
+.review-report summary { cursor: pointer; color: var(--app-primary); }
+.review-report-form, .review-moderation-form, .report-resolution-form {
+  display: grid;
+  gap: 8px;
+  max-width: 620px;
+  margin-top: 12px;
+}
+.review-report-form button, .review-moderation-form button, .report-resolution-form button { justify-self: start; }
+.review-visibility { padding: 2px 7px; border-radius: 999px; background: var(--app-surface-subtle); font-size: 0.72rem; }
+.review-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.notification-entry { display: flex; justify-content: space-between; align-items: start; gap: 16px; padding: 16px; }
+.notification-entry.is-unread { border-left: 3px solid var(--app-primary); background: var(--app-surface-subtle); }
+.notification-entry p { white-space: pre-wrap; overflow-wrap: anywhere; }
+.notification-entry button { flex: 0 0 auto; }
+.muted-copy { color: var(--app-muted); font-size: 0.84rem; }
+.technician-candidate-list { display: grid; gap: 8px; max-height: 360px; margin: 12px 0; overflow: auto; }
+.technician-candidate { display: flex; align-items: center; gap: 8px; border: 1px solid var(--app-border); border-radius: 10px; padding: 6px; }
+.technician-candidate-select { display: grid; justify-items: start; gap: 2px; flex: 1; border: 0; background: transparent; text-align: left; cursor: pointer; }
+.technician-candidate-select.is-selected { background: var(--app-surface-subtle); outline: 2px solid var(--app-primary); }
+.technician-candidate-select span, .technician-candidate-select small { color: var(--app-muted); font-size: 0.74rem; }
+.technician-candidate .text-link { margin-right: 6px; white-space: nowrap; }
+
 .loading-state,
 .empty-state,
 .error-state,
