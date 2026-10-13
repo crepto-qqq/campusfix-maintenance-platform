@@ -4,6 +4,8 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Set;
+import java.util.stream.Collectors;
 
 import com.campusfix.ticket.Ticket;
 import com.campusfix.ticket.TicketEventType;
@@ -63,6 +65,7 @@ public class DataInitializer implements CommandLineRunner {
         migrateLegacyUserTable();
         enforceAccountConstraints();
         ensureRelationalUserData();
+        migrateManagerAssignments();
         ensureAdministrator();
         migrateTicketStatuses();
         backfillTicketHistory();
@@ -255,6 +258,26 @@ public class DataInitializer implements CommandLineRunner {
             if (user.getRole() == null) {
                 user.assignRole(requesterRole, null);
             }
+            userRepository.save(user);
+        }
+    }
+
+    /** Preserve supported grants and the audit trail when retiring the Manager role. */
+    private void migrateManagerAssignments() {
+        SystemRole requesterRole = systemRoleRepository.findByCode(Role.GENERAL_USER)
+                .orElseThrow();
+        for (User user : userRepository.findAll()) {
+            if (!user.hasRole(Role.MANAGER)) {
+                continue;
+            }
+            Set<Role> retained = user.getRoles().stream()
+                    .filter(Role::isSelectable)
+                    .collect(Collectors.toSet());
+            if (retained.isEmpty()) {
+                user.assignRole(requesterRole, null);
+                retained = Set.of(Role.GENERAL_USER);
+            }
+            user.revokeRolesExcept(retained);
             userRepository.save(user);
         }
     }

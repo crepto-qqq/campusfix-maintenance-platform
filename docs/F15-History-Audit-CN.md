@@ -35,7 +35,7 @@ GET /api/tickets/{ticketId}/history
 ```
 
 - Requester只能查看自己工单的历史。
-- Administrator和Manager可以查看全部工单历史。
+- 活动角色为Administrator时可查看全部工单历史；Maintenance Staff只能查看有效分配给自己的工单历史。
 - 其他无权用户返回 `403 Forbidden`。
 - 历史按照时间和ID正序返回。
 

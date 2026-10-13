@@ -5,14 +5,14 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Login | CampusFix</title>
     <link rel="stylesheet" href="./css/styles.css">
-    <link rel="stylesheet" href="./css/theme.css?v=20261005">
+    <link rel="stylesheet" href="./css/theme.css?v=20261014">
     <script src="./js/background.js?v=20261005" defer></script>
   </head>
   <body class="login-page">
     <main class="container">
       <h1>CampusFix</h1>
 
-      <section>
+      <section id="login-section">
         <h2>Login</h2>
 
         <form id="login-form">
@@ -28,8 +28,15 @@
         <p>Don't have an account? <a href="./register.html">Create an account</a></p>
         <p id="auth-message" role="status"></p>
       </section>
+
+      <section id="role-selection-section" hidden aria-labelledby="role-selection-title">
+        <h2 id="role-selection-title">Choose your role</h2>
+        <p id="role-selection-message" role="status" aria-live="polite"></p>
+        <div id="role-selection-options" class="role-selection-options"></div>
+        <button id="role-selection-logout" class="secondary-button" type="button">Log out</button>
+      </section>
     </main>
 
-    <script src="./js/app.js?v=20261012"></script>
+    <script src="./js/app.js?v=20261014"></script>
   </body>
 </html>

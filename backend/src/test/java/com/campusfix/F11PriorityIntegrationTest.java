@@ -39,10 +39,6 @@ class F11PriorityIntegrationTest {
                 publicClient,
                 "Priority Requester",
                 "priority.requester@test.local");
-        long managerId = register(
-                publicClient,
-                "Priority Manager",
-                "priority.manager@test.local");
 
         HttpClient requesterClient = login(
                 "priority.requester@test.local",
@@ -139,20 +135,6 @@ class F11PriorityIntegrationTest {
         assertTrue(history.contains("\"reason\":\"Safety impact\""));
         assertTrue(history.contains("\"actorName\":\"Administrator\""));
         assertTrue(history.contains("\"occurredAt\":"));
-
-        // Manager can read the final priority but cannot modify it.
-        assertEquals(200, put(
-                adminClient,
-                "/api/admin/users/" + managerId,
-                "{\"identityType\":\"CAMPUS_STAFF\",\"role\":\"MANAGER\"}").statusCode());
-        HttpClient managerClient = login("priority.manager@test.local", "password123");
-        assertTrue(get(managerClient, "/api/tickets").body()
-                .contains("\"operationalPriority\":\"HIGH\""));
-        assertEquals(adminSummary, get(managerClient, "/api/tickets/priority-summary").body());
-        assertEquals(403, put(
-                managerClient,
-                "/api/tickets/" + ticketId + "/priority",
-                "{\"priority\":\"CRITICAL\"}").statusCode());
 
         String finalDetail = get(adminClient, "/api/tickets/" + ticketId).body();
         assertTrue(finalDetail.contains("\"operationalPriority\":\"HIGH\""));

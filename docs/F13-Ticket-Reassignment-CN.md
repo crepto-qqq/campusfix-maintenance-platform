@@ -2,7 +2,7 @@
 
 ## 行为
 
-仅拥有 `ADMINISTRATOR` 角色的登录用户可以把已有有效分配的工单转给另一名有效维修人员。目标账号必须处于 `ACTIVE` 状态并拥有 `MAINTENANCE_STAFF` 角色。
+仅以 `ADMINISTRATOR` 为当前活动角色的登录用户可以把已有有效分配的工单转给另一名有效维修人员。目标账号必须处于 `ACTIVE` 状态并拥有 `MAINTENANCE_STAFF` 角色。
 
 允许重新分配的状态为：
 

@@ -92,6 +92,21 @@ a:hover {
   width: min(90%, 484px);
 }
 
+.role-selection-options {
+  display: grid;
+  gap: 10px;
+  margin: 18px 0;
+}
+
+.role-selection-options .role-choice {
+  width: 100%;
+  text-align: left;
+}
+
+#role-selection-logout {
+  width: 100%;
+}
+
 .site-background {
   position: fixed;
   inset: 0;
@@ -1358,6 +1373,27 @@ button:disabled {
   flex-wrap: wrap;
   justify-content: flex-end;
   gap: 10px;
+}
+
+.dashboard-role-switcher {
+  display: grid;
+  gap: 3px;
+  min-width: 190px;
+}
+
+.dashboard-role-switcher label {
+  color: var(--app-muted);
+  font-size: 0.75rem;
+}
+
+.dashboard-role-switcher select {
+  min-width: 190px;
+}
+
+.dashboard-role-switcher [role="status"] {
+  min-height: 1em;
+  color: var(--app-muted);
+  font-size: 0.75rem;
 }
 
 .surface,
