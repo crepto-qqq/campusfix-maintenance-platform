@@ -130,7 +130,7 @@ erDiagram
 - `app_users.id` is preserved, so `tickets.submitted_by` and `ticket_history.actor_id` remain valid.
 - Public registration still creates `STUDENT + GENERAL_USER`.
 - Admin updates create/revoke `user_role_assignments`; the change persists after re-login.
-- Only one active role is allowed by the service layer, while previous assignments remain available as audit data.
+- An account may have several active role assignments; each request uses one selected active role, while previous assignments remain available as audit data.
 - Existing plaintext passwords are converted to BCrypt hashes during migration.
 - Profile, Avatar, Request and History APIs retain their existing request and response contracts.
 - `tickets.operational_priority`独立于Requester填写的`urgency`，允许`NULL`表示尚未由Administrator分级，并建立`idx_tickets_operational_priority`索引。

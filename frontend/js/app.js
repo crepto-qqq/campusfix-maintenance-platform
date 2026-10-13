@@ -10,6 +10,11 @@ const verificationCodeInput = document.getElementById('verification-code');
 const sendVerificationCodeButton = document.getElementById('send-verification-code');
 const verificationMessage = document.getElementById('verification-message');
 const loginForm = document.getElementById('login-form');
+const loginSection = document.getElementById('login-section');
+const roleSelectionSection = document.getElementById('role-selection-section');
+const roleSelectionOptions = document.getElementById('role-selection-options');
+const roleSelectionMessage = document.getElementById('role-selection-message');
+const roleSelectionLogout = document.getElementById('role-selection-logout');
 const logoutButton = document.getElementById('logout-button');
 const authMessage = document.getElementById('auth-message');
 const workspaceRole = document.getElementById('workspace-role');
@@ -50,18 +55,127 @@ let selectedTicketFiles = [];
 let existingTicketImages = [];
 let previewObjectUrls = [];
 let lastLightboxTrigger = null;
+let loginSubmissionStarted = false;
+let dashboardLoadVersion = 0;
+const SELECTABLE_ROLES = ['GENERAL_USER', 'ADMINISTRATOR', 'MAINTENANCE_STAFF'];
+const ACTIVE_ROLE_STORAGE_KEY = 'campusfix.activeRole';
+const ROLE_TAB_ID_KEY = 'campusfix.roleTabId';
+const AUTH_EVENT_STORAGE_KEY = 'campusfix.authEvent';
+
+function roleStorage() {
+  try { return window.sessionStorage ?? null; } catch (_) { return null; }
+}
+
+function ensureIndependentTab() {
+  const storage = roleStorage();
+  if (!storage || typeof window.name !== 'string') return;
+  try {
+    const savedTabId = storage.getItem(ROLE_TAB_ID_KEY);
+    if (savedTabId && window.name === savedTabId) return;
+    storage.removeItem(ACTIVE_ROLE_STORAGE_KEY);
+    const tabId = `campusfix-role-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+    window.name = tabId;
+    storage.setItem(ROLE_TAB_ID_KEY, tabId);
+  } catch (_) { /* Role selection will be requested again if storage is unavailable. */ }
+}
+
+ensureIndependentTab();
+
+function readStoredRole() {
+  try {
+    const value = roleStorage()?.getItem(ACTIVE_ROLE_STORAGE_KEY);
+    if (!value) return null;
+    const selection = JSON.parse(value);
+    return selection?.userId && SELECTABLE_ROLES.includes(selection.role) ? selection : null;
+  } catch (_) { return null; }
+}
+
+function storeActiveRole(userId, role) {
+  try { roleStorage()?.setItem(ACTIVE_ROLE_STORAGE_KEY, JSON.stringify({ userId, role })); } catch (_) { /* See above. */ }
+}
+
+function clearActiveRole() {
+  try { roleStorage()?.removeItem(ACTIVE_ROLE_STORAGE_KEY); } catch (_) { /* See above. */ }
+}
+
+function broadcastAccountChange(type, userId = null) {
+  try {
+    window.localStorage?.setItem(AUTH_EVENT_STORAGE_KEY, JSON.stringify({
+      type, userId, nonce: `${Date.now()}-${Math.random()}`
+    }));
+  } catch (_) { /* Other tabs also check the account when focused. */ }
+}
+
+function hideCurrentWorkspace() {
+  dashboardLoadVersion += 1;
+  const main = document.getElementById('main-content');
+  if (main) main.hidden = true;
+  if (workspaceRole) workspaceRole.hidden = true;
+  if (adminLink) adminLink.hidden = true;
+}
+
+function handleAccountChange(event) {
+  if (event?.key !== AUTH_EVENT_STORAGE_KEY || !event.newValue) return;
+  clearActiveRole();
+  currentWorkspaceUser = null;
+  hideCurrentWorkspace();
+  window.location.href = './index.html';
+}
+
+async function revalidateFocusedAccount() {
+  const previous = currentWorkspaceUser;
+  if (!previous) return;
+  const previousRole = getActiveRole(previous);
+  const stored = readStoredRole();
+  const user = await readCurrentUserSnapshot(stored);
+  const latestStored = readStoredRole();
+  if (currentWorkspaceUser !== previous || getActiveRole(previous) !== previousRole
+      || latestStored?.role !== stored?.role || String(latestStored?.userId) !== String(stored?.userId)) return;
+  if (!user || String(user.id) !== String(previous.id)) {
+    clearActiveRole();
+    currentWorkspaceUser = null;
+    hideCurrentWorkspace();
+    window.location.href = './index.html';
+    return;
+  }
+  const currentRole = getActiveRole(user);
+  if (currentRole !== previousRole) {
+    if (currentRole) storeActiveRole(user.id, currentRole);
+    else clearActiveRole();
+    currentWorkspaceUser = null;
+    hideCurrentWorkspace();
+    window.location.href = currentRole ? './workspace.html' : './index.html?selectRole=1';
+  }
+}
+
+window.addEventListener?.('storage', handleAccountChange);
+window.addEventListener?.('focus', revalidateFocusedAccount);
 
 function rolesFor(user) {
   const roles = Array.isArray(user?.roles) ? user.roles : (user?.role ? [user.role] : []);
   return [...new Set(roles.filter(Boolean))];
 }
 
+function selectableRolesFor(user) {
+  return SELECTABLE_ROLES.filter((role) => rolesFor(user).includes(role));
+}
+
+function getActiveRole(user) {
+  const granted = selectableRolesFor(user);
+  if (granted.includes(user?.activeRole)) return user.activeRole;
+  return granted.length === 1 && rolesFor(user).length === 1 ? granted[0] : null;
+}
+
+function hasActiveRole(user, role) {
+  return getActiveRole(user) === role;
+}
+
 function hasRole(user, role) {
-  return rolesFor(user).includes(role);
+  return hasActiveRole(user, role);
 }
 
 function canViewAllRequests(user) {
-  return hasRole(user, 'ADMINISTRATOR') || hasRole(user, 'MANAGER');
+  return hasRole(user, 'ADMINISTRATOR');
 }
 
 function hasOperationalRole(user) {
@@ -69,7 +183,7 @@ function hasOperationalRole(user) {
 }
 
 function isTicketOwner(ticket, user = currentWorkspaceUser) {
-  return Boolean(ticket && user && ticket.submittedById === user.id);
+  return Boolean(ticket && user && hasActiveRole(user, 'GENERAL_USER') && ticket.submittedById === user.id);
 }
 
 function isAssignedTechnician(ticket, user = currentWorkspaceUser) {
@@ -84,9 +198,9 @@ function isTerminalStatus(status) {
 
 function getRoleMode(user) {
   if (hasRole(user, 'ADMINISTRATOR')) return 'administrator';
-  if (hasRole(user, 'MANAGER')) return 'manager';
   if (hasRole(user, 'MAINTENANCE_STAFF')) return 'technician';
-  return 'requester';
+  if (hasRole(user, 'GENERAL_USER')) return 'requester';
+  return null;
 }
 
 function elementByAnyId(...ids) {
@@ -109,18 +223,26 @@ async function readApiError(response, fallbackMessage) {
 async function apiRequest(path, options = {}) {
   const { redirectOnUnauthorized = true, ...fetchOptions } = options;
   const hasFormDataBody = typeof FormData !== 'undefined' && fetchOptions.body instanceof FormData;
+  const activeRole = currentWorkspaceUser ? getActiveRole(currentWorkspaceUser) : readStoredRole()?.role;
   const response = await fetch(`${API_BASE_URL}${path}`, {
     credentials: 'include',
     ...fetchOptions,
     headers: {
       ...(hasFormDataBody ? {} : fetchOptions.body ? { 'Content-Type': 'application/json' } : {}),
+      ...(!path.startsWith('/auth/') && activeRole ? { 'X-Active-Role': activeRole } : {}),
       ...(fetchOptions.headers ?? {})
     }
   });
 
   if (response.status === 401 && redirectOnUnauthorized) {
+    clearActiveRole();
     window.location.href = './index.html';
     throw new Error('Your session has expired. Please log in again.');
+  }
+  if ([403, 409].includes(response.status) && !path.startsWith('/auth/')) {
+    if (await recoverRoleSelection()) {
+      throw new Error('Your active role changed. Choose a role to continue.');
+    }
   }
   return response;
 }
@@ -133,20 +255,78 @@ async function fetchJson(path, fallbackMessage, options = {}) {
   return response.status === 204 || typeof response.json !== 'function' ? null : response.json();
 }
 
-async function loadCurrentUser() {
+async function readCurrentUserSnapshot(stored = readStoredRole()) {
   try {
-    const response = await fetch(`${API_BASE_URL}/users/me`, { credentials: 'include' });
+    const requestProfile = (role) => fetch(`${API_BASE_URL}/users/me`, {
+      credentials: 'include',
+      headers: role ? { 'X-Active-Role': role } : {}
+    });
+    let response = await requestProfile(stored?.role);
+    if (response.status === 409) {
+      response = await requestProfile(null);
+    }
     if (!response.ok) return null;
-    return await response.json();
+    let user = await response.json();
+    if (stored && String(stored.userId) !== String(user.id)) {
+      response = await requestProfile(null);
+      if (!response.ok) return null;
+      user = await response.json();
+    }
+    return user;
   } catch (_) {
     return null;
   }
+}
+
+async function loadCurrentUser() {
+  const user = await readCurrentUserSnapshot();
+  if (!user) return null;
+  const activeRole = getActiveRole(user);
+  if (activeRole) storeActiveRole(user.id, activeRole);
+  else clearActiveRole();
+  return user;
+}
+
+async function recoverRoleSelection() {
+  const selected = readStoredRole();
+  const selectedRole = selected?.role ?? getActiveRole(currentWorkspaceUser);
+  const selectedUserId = selected?.userId ?? currentWorkspaceUser?.id;
+  const check = await fetch(`${API_BASE_URL}/users/me`, {
+    credentials: 'include',
+    headers: selectedRole ? { 'X-Active-Role': selectedRole } : {}
+  }).catch(() => null);
+  if (check?.ok) {
+    const user = await check.json().catch(() => null);
+    if (user && getActiveRole(user) === selectedRole && String(user.id) === String(selectedUserId)) {
+      return false;
+    }
+  }
+  hideCurrentWorkspace();
+  clearActiveRole();
+  currentWorkspaceUser = null;
+  const user = await loadCurrentUser();
+  if (!user) {
+    window.location.href = './index.html';
+    return true;
+  }
+  const role = getActiveRole(user);
+  if (role) {
+    storeActiveRole(user.id, role);
+    window.location.href = './workspace.html';
+    return true;
+  }
+  window.location.href = './index.html?selectRole=1';
+  return true;
 }
 
 async function requireCurrentUser() {
   const user = await loadCurrentUser();
   if (!user) {
     window.location.href = './index.html';
+    return null;
+  }
+  if (!getActiveRole(user)) {
+    window.location.href = './index.html?selectRole=1';
     return null;
   }
   currentWorkspaceUser = user;
@@ -157,10 +337,11 @@ async function requireCurrentUser() {
 
 function displayWorkspaceRole(user) {
   if (workspaceRole) {
-    workspaceRole.textContent = rolesFor(user).map(formatRole).join(' · ');
-    workspaceRole.hidden = false;
+    const role = getActiveRole(user);
+    workspaceRole.textContent = role ? formatRole(role) : '';
+    workspaceRole.hidden = !role;
   }
-  if (adminLink) adminLink.hidden = !hasRole(user, 'ADMINISTRATOR');
+  if (adminLink) adminLink.hidden = !hasActiveRole(user, 'ADMINISTRATOR');
 
   const userName = document.getElementById('workspace-user-name');
   if (userName) userName.textContent = user.name;
@@ -199,6 +380,64 @@ function setupAppShell() {
 
 function getLandingPage() {
   return './workspace.html';
+}
+
+async function chooseActiveRole(user, role) {
+  if (!selectableRolesFor(user).includes(role)) {
+    throw new Error('This role is no longer available for your account.');
+  }
+  const result = await fetchJson('/auth/active-role', 'Role selection failed', {
+    method: 'POST',
+    body: JSON.stringify({ role })
+  });
+  if (result?.activeRole !== role) {
+    throw new Error('Role selection could not be confirmed. Please try again.');
+  }
+  storeActiveRole(user.id, role);
+  currentWorkspaceUser = { ...user, activeRole: role };
+  return currentWorkspaceUser;
+}
+
+function renderRoleChooser(user) {
+  if (!roleSelectionSection || !roleSelectionOptions) return;
+  loginSection.hidden = true;
+  roleSelectionSection.hidden = false;
+  setText(authMessage, '');
+  const roles = selectableRolesFor(user);
+  if (!roles.length) {
+    setText(roleSelectionMessage, 'No supported role is assigned to this account. Contact an administrator.');
+    roleSelectionOptions.innerHTML = '';
+    return;
+  }
+  setText(roleSelectionMessage, 'Choose the workspace you want to use.');
+  roleSelectionOptions.innerHTML = roles.map((role) =>
+    `<button type="button" class="role-choice" data-role="${role}">${formatRole(role)}</button>`
+  ).join('');
+  roleSelectionOptions.querySelectorAll('button[data-role]').forEach((button) => {
+    button.addEventListener('click', async () => {
+      roleSelectionOptions.querySelectorAll('button').forEach((choice) => { choice.disabled = true; });
+      setText(roleSelectionMessage, 'Opening your workspace...');
+      try {
+        await chooseActiveRole(user, button.dataset.role);
+        window.location.href = getLandingPage();
+      } catch (error) {
+        setText(roleSelectionMessage, error.message);
+        roleSelectionOptions.querySelectorAll('button').forEach((choice) => { choice.disabled = false; });
+      }
+    });
+  });
+}
+
+async function initLoginPage() {
+  if (!loginForm) return;
+  const user = await loadCurrentUser();
+  if (loginSubmissionStarted) return;
+  if (!user) return;
+  if (getActiveRole(user)) {
+    window.location.href = getLandingPage();
+    return;
+  }
+  renderRoleChooser(user);
 }
 
 function startVerificationCooldown(seconds) {
@@ -266,9 +505,10 @@ if (registrationForm) {
 if (loginForm) {
   loginForm.addEventListener('submit', async (event) => {
     event.preventDefault();
+    loginSubmissionStarted = true;
     setText(authMessage, 'Logging in...');
     try {
-      await fetchJson('/auth/login', 'Login failed', {
+      const user = await fetchJson('/auth/login', 'Login failed', {
         method: 'POST',
         redirectOnUnauthorized: false,
         body: JSON.stringify({
@@ -276,7 +516,14 @@ if (loginForm) {
           password: document.getElementById('login-password').value
         })
       });
-      window.location.href = getLandingPage();
+      clearActiveRole();
+      broadcastAccountChange('login', user.id);
+      if (getActiveRole(user)) {
+        storeActiveRole(user.id, getActiveRole(user));
+        window.location.href = getLandingPage();
+      } else {
+        renderRoleChooser(user);
+      }
     } catch (error) {
       setText(authMessage, error.message.includes('(401)') ? 'Invalid email or password.' : error.message);
     }
@@ -289,7 +536,7 @@ async function getVisibleTickets() {
 
 function scopeTicketsForDashboard(tickets, user) {
   const mode = getRoleMode(user);
-  if (mode === 'administrator' || mode === 'manager') return tickets;
+  if (mode === 'administrator') return tickets;
   if (mode === 'technician') {
     return tickets.filter((ticket) => ticket.assignedTechnicianId === user.id);
   }
@@ -312,15 +559,6 @@ function dashboardMetricsFor(user, tickets) {
       ['Needs attention', tickets.filter(needsAttention).length, 'view=attention', 'Requests needing a decision'],
       ['Unassigned', tickets.filter((ticket) => !isTerminalStatus(ticket.status) && !ticket.assignedTechnicianId).length,
         'view=unassigned', 'Waiting for a technician'],
-      ['In progress', tickets.filter((ticket) => ticket.status === 'IN_PROGRESS').length,
-        'status=IN_PROGRESS', 'Work currently underway'],
-      ['Completed', tickets.filter(completed).length, 'view=completed', 'Finished requests']
-    ];
-  }
-  if (mode === 'manager') {
-    return [
-      ['Open requests', tickets.filter((ticket) => !isTerminalStatus(ticket.status)).length,
-        'view=active', 'Across campus'],
       ['In progress', tickets.filter((ticket) => ticket.status === 'IN_PROGRESS').length,
         'status=IN_PROGRESS', 'Work currently underway'],
       ['Completed', tickets.filter(completed).length, 'view=completed', 'Finished requests']
@@ -453,18 +691,23 @@ function renderRequestRows(tickets, container, messageElement, user = currentWor
 }
 
 async function loadDashboardData(user = currentWorkspaceUser) {
+  const version = ++dashboardLoadVersion;
   const message = elementByAnyId('dashboard-message');
   const list = elementByAnyId('dashboard-tickets', 'dashboard-focus-list', 'attention-requests-list');
   const metrics = elementByAnyId('dashboard-metrics', 'dashboard-stats');
   setText(message, 'Loading your workspace...');
   try {
-    visibleTickets = await getVisibleTickets();
+    const tickets = await getVisibleTickets();
+    if (version !== dashboardLoadVersion
+        || (currentWorkspaceUser && getActiveRole(user) !== getActiveRole(currentWorkspaceUser))) return;
+    visibleTickets = tickets;
     const scopedTickets = scopeTicketsForDashboard(visibleTickets, user);
     renderDashboardMetrics(user, scopedTickets);
     renderRequestRows(focusTicketsFor(user, scopedTickets), list, message, user,
       'There are no active requests needing attention.');
     message?.classList.remove('error-state');
   } catch (error) {
+    if (version !== dashboardLoadVersion) return;
     if (list) {
       list.innerHTML = '';
       list.setAttribute('aria-busy', 'false');
@@ -478,9 +721,54 @@ async function loadDashboardData(user = currentWorkspaceUser) {
   }
 }
 
+function setupDashboardRoleSwitcher(user) {
+  const container = document.getElementById('dashboard-role-switcher');
+  const select = document.getElementById('dashboard-role-select');
+  const message = document.getElementById('dashboard-role-message');
+  if (!container || !select) return;
+  const roles = selectableRolesFor(user);
+  container.hidden = roles.length < 2;
+  if (container.hidden) return;
+  select.innerHTML = roles.map((role) =>
+    `<option value="${role}">${formatRole(role)}</option>`
+  ).join('');
+  select.value = getActiveRole(user);
+  select.addEventListener('change', async () => {
+    const previous = getActiveRole(currentWorkspaceUser);
+    const next = select.value;
+    if (next === previous) return;
+    select.disabled = true;
+    setText(message, 'Switching workspace...');
+    try {
+      const selectedUser = await chooseActiveRole(currentWorkspaceUser, next);
+      visibleTickets = [];
+      const metrics = elementByAnyId('dashboard-metrics', 'dashboard-stats');
+      const tickets = elementByAnyId('dashboard-tickets', 'dashboard-focus-list', 'attention-requests-list');
+      if (metrics) {
+        metrics.innerHTML = '';
+        metrics.setAttribute('aria-busy', 'true');
+      }
+      if (tickets) {
+        tickets.innerHTML = '';
+        tickets.setAttribute('aria-busy', 'true');
+      }
+      displayWorkspaceRole(selectedUser);
+      applyRoleVisibility(selectedUser);
+      setText(message, `Viewing as ${formatRole(next)}.`);
+      await loadDashboardData(selectedUser);
+    } catch (error) {
+      select.value = previous;
+      setText(message, error.message);
+    } finally {
+      select.disabled = false;
+    }
+  });
+}
+
 async function initDashboard() {
   const user = await requireCurrentUser();
   if (!user) return;
+  setupDashboardRoleSwitcher(user);
   await loadDashboardData(user);
 }
 
@@ -647,11 +935,15 @@ function getTicketIdFromUrl() {
 }
 
 function imageUrl(ticketId, imageId) {
-  return `${API_BASE_URL}/tickets/${encodeURIComponent(ticketId)}/images/${encodeURIComponent(imageId)}`;
+  const role = getActiveRole(currentWorkspaceUser);
+  return `${API_BASE_URL}/tickets/${encodeURIComponent(ticketId)}/images/${encodeURIComponent(imageId)}`
+    + (role ? `?activeRole=${encodeURIComponent(role)}` : '');
 }
 
 function evidenceImageUrl(ticketId, evidenceId) {
-  return `${API_BASE_URL}/tickets/${encodeURIComponent(ticketId)}/completion-evidence/${encodeURIComponent(evidenceId)}/image`;
+  const role = getActiveRole(currentWorkspaceUser);
+  return `${API_BASE_URL}/tickets/${encodeURIComponent(ticketId)}/completion-evidence/${encodeURIComponent(evidenceId)}/image`
+    + (role ? `?activeRole=${encodeURIComponent(role)}` : '');
 }
 
 function renderTicketGallery(ticket) {
@@ -1445,10 +1737,11 @@ async function initRequestFormPage() {
   const user = await requireCurrentUser();
   if (!user) return;
   if (!hasRole(user, 'GENERAL_USER')) {
-    ticketForm?.setAttribute('hidden', '');
-    setText(ticketMessage, 'Requester access is required to create a maintenance request.');
+    window.location.href = getLandingPage();
     return;
   }
+  const requestFormPage = document.getElementById('request-form-page');
+  if (requestFormPage) requestFormPage.hidden = false;
   const imageInput = document.getElementById('ticket-images');
   imageInput?.addEventListener('change', () => {
     addSelectedTicketFiles(imageInput.files);
@@ -1533,8 +1826,8 @@ function escapeHtml(value) {
 
 function formatRole(role) {
   const labels = {
-    GENERAL_USER: 'Requester', MAINTENANCE_STAFF: 'Maintenance Staff',
-    ADMINISTRATOR: 'Administrator', MANAGER: 'Manager'
+    GENERAL_USER: 'Student', MAINTENANCE_STAFF: 'Maintenance Staff',
+    ADMINISTRATOR: 'Administrator'
   };
   return labels[role] ?? role ?? '';
 }
@@ -1551,6 +1844,7 @@ async function loadProfile() {
     if (!user) return;
     displayProfile(user);
     setText(authMessage, '');
+    return user;
   } catch (error) {
     setText(authMessage, error.message);
   }
@@ -1560,7 +1854,8 @@ function displayProfile(user) {
   setText(document.getElementById('profile-id'), user.id);
   setText(document.getElementById('profile-email'), user.email);
   setText(document.getElementById('profile-identity-type'), formatIdentityType(user.identityType));
-  setText(document.getElementById('profile-role'), rolesFor(user).map(formatRole).join(', '));
+  setText(document.getElementById('profile-active-role'), formatRole(getActiveRole(user)));
+  setText(document.getElementById('profile-role'), selectableRolesFor(user).map(formatRole).join(', '));
   const name = document.getElementById('profile-name');
   const contact = document.getElementById('contact-information');
   const details = document.getElementById('profile-details');
@@ -1571,7 +1866,8 @@ function displayProfile(user) {
 
 async function loadAvatar() {
   if (!profileAvatar) return;
-  const response = await apiRequest(`/users/me/avatar?v=${Date.now()}`);
+  const role = getActiveRole(currentWorkspaceUser);
+  const response = await apiRequest(`/users/me/avatar?v=${Date.now()}${role ? `&activeRole=${encodeURIComponent(role)}` : ''}`);
   if (response.status === 404) {
     profileAvatar.hidden = true;
     return;
@@ -1630,8 +1926,8 @@ function bindProfileForms() {
 
 async function initProfilePage() {
   bindProfileForms();
-  await loadProfile();
-  await loadAvatar().catch((error) => setText(authMessage, error.message));
+  const user = await loadProfile();
+  if (user) await loadAvatar().catch((error) => setText(authMessage, error.message));
 }
 
 async function initAdminPage() {
@@ -1641,6 +1937,7 @@ async function initAdminPage() {
     window.location.href = getLandingPage();
     return;
   }
+  if (adminPage) adminPage.hidden = false;
   await loadAdminUsers();
 }
 
@@ -1689,7 +1986,7 @@ function createIdentityOptions(selectedIdentityType) {
 }
 
 function createRoleOptions(selectedRoles) {
-  return ['GENERAL_USER', 'MAINTENANCE_STAFF', 'ADMINISTRATOR', 'MANAGER'].map((role) => `
+  return SELECTABLE_ROLES.map((role) => `
     <label><input class="admin-role-checkbox" type="checkbox" value="${role}"
       ${selectedRoles.includes(role) ? 'checked' : ''}> ${formatRole(role)}</label>`).join('');
 }
@@ -1700,9 +1997,26 @@ async function updateAdminUserAccess(userId, identityType, roles) {
     await fetchJson(`/admin/users/${userId}`, 'User access update failed', {
       method: 'PUT', body: JSON.stringify({ identityType, roles })
     });
+    if (String(userId) === String(currentWorkspaceUser?.id)) {
+      if (!roles.includes('ADMINISTRATOR') && adminPage) adminPage.hidden = true;
+      const updatedUser = await loadCurrentUser();
+      if (!updatedUser) {
+        window.location.href = './index.html';
+        return;
+      }
+      currentWorkspaceUser = updatedUser;
+      if (!hasActiveRole(updatedUser, 'ADMINISTRATOR')) {
+        window.location.href = getActiveRole(updatedUser)
+          ? getLandingPage()
+          : './index.html?selectRole=1';
+        return;
+      }
+      displayWorkspaceRole(updatedUser);
+    }
     await loadAdminUsers();
     setText(adminMessage, 'Identity and roles updated.');
   } catch (error) {
+    if (!currentWorkspaceUser || !hasActiveRole(currentWorkspaceUser, 'ADMINISTRATOR')) return;
     await loadAdminUsers();
     setText(adminMessage, error.message);
   }
@@ -1713,12 +2027,8 @@ async function initWorkspace() {
   if (pageName === 'dashboard' || elementByAnyId('dashboard-metrics', 'dashboard-stats')) {
     return initDashboard();
   }
-  const user = await loadCurrentUser();
-  if (!user) {
-    window.location.href = './index.html';
-    return;
-  }
-  currentWorkspaceUser = user;
+  const user = await requireCurrentUser();
+  if (!user) return;
   displayWorkspaceRole(user);
   document.querySelectorAll('.requester-content').forEach((element) => {
     element.hidden = !hasRole(user, 'GENERAL_USER');
@@ -1727,7 +2037,7 @@ async function initWorkspace() {
   if (roleMessage) roleMessage.hidden = !hasOperationalRole(user);
   setText(document.getElementById('role-workspace-title'), 'Your Workspace');
   setText(document.getElementById('role-workspace-description'),
-    `Your roles: ${rolesFor(user).map(formatRole).join(', ')}.`);
+    `Current role: ${formatRole(getActiveRole(user))}.`);
   if (hasOperationalRole(user) && allRequestsSection) {
     allRequestsSection.hidden = false;
     setText(allRequestsTitle, canViewAllRequests(user) ? 'All Maintenance Requests' : 'My Assigned Requests');
@@ -1823,6 +2133,8 @@ if (logoutButton) {
     try {
       const response = await apiRequest('/auth/logout', { method: 'POST' });
       if (!response.ok) throw new Error(`Logout failed (${response.status}).`);
+      clearActiveRole();
+      broadcastAccountChange('logout');
       window.location.href = './index.html';
     } catch (error) {
       setText(authMessage, error.message);
@@ -1830,7 +2142,22 @@ if (logoutButton) {
   });
 }
 
+roleSelectionLogout?.addEventListener('click', async () => {
+  roleSelectionLogout.disabled = true;
+  try {
+    const response = await apiRequest('/auth/logout', { method: 'POST', redirectOnUnauthorized: false });
+    if (!response.ok) throw new Error('Logout failed. Please try again.');
+    clearActiveRole();
+    broadcastAccountChange('logout');
+    window.location.href = './index.html';
+  } catch (error) {
+    setText(roleSelectionMessage, error.message);
+    roleSelectionLogout.disabled = false;
+  }
+});
+
 setupAppShell();
+if (loginForm) initLoginPage();
 if (pageName === 'dashboard') initDashboard();
 else if (pageName === 'requests') initRequestsPage();
 else if (['request-detail', 'detail'].includes(pageName)) initRequestDetailPage();

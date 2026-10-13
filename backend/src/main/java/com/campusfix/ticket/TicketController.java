@@ -60,7 +60,8 @@ public class TicketController {
     @GetMapping
     public List<TicketResponse> getVisibleTickets(HttpSession session) {
         User viewer = accessControlService.requireAuthenticatedUser(session);
-        return ticketService.getTicketsForViewer(viewer).stream()
+        Role activeRole = accessControlService.requireActiveRole(viewer);
+        return ticketService.getTicketsForViewer(viewer, activeRole).stream()
                 .map(this::createTicketResponse)
                 .toList();
     }
@@ -68,7 +69,8 @@ public class TicketController {
     @GetMapping("/priority-summary")
     public TicketPrioritySummary getPrioritySummary(HttpSession session) {
         User viewer = accessControlService.requireAuthenticatedUser(session);
-        return ticketService.getPrioritySummary(viewer);
+        Role activeRole = accessControlService.requireActiveRole(viewer);
+        return ticketService.getPrioritySummary(viewer, activeRole);
     }
 
     @GetMapping("/technicians")
@@ -84,7 +86,8 @@ public class TicketController {
             @PathVariable("ticketId") Long ticketId,
             HttpSession session) {
         User viewer = accessControlService.requireAuthenticatedUser(session);
-        Ticket ticket = ticketService.getTicketForViewer(ticketId, viewer);
+        Role activeRole = accessControlService.requireActiveRole(viewer);
+        Ticket ticket = ticketService.getTicketForViewer(ticketId, viewer, activeRole);
         return createTicketResponse(ticket);
     }
 
@@ -93,7 +96,8 @@ public class TicketController {
             @PathVariable("ticketId") Long ticketId,
             HttpSession session) {
         User viewer = accessControlService.requireAuthenticatedUser(session);
-        return ticketService.getTicketHistory(ticketId, viewer).stream()
+        Role activeRole = accessControlService.requireActiveRole(viewer);
+        return ticketService.getTicketHistory(ticketId, viewer, activeRole).stream()
                 .map(this::createHistoryResponse)
                 .toList();
     }
@@ -156,8 +160,8 @@ public class TicketController {
             @RequestParam("repairNotes") String repairNotes,
             @RequestParam("image") MultipartFile image,
             HttpSession session) {
-        validateImage(image);
         User technician = accessControlService.requireRole(session, Role.MAINTENANCE_STAFF);
+        validateImage(image);
         return createCompletionEvidenceResponse(ticketService.addCompletionEvidence(
                 ticketId, technician, repairNotes, image));
     }
@@ -167,7 +171,8 @@ public class TicketController {
             @PathVariable("ticketId") Long ticketId,
             HttpSession session) {
         User viewer = accessControlService.requireAuthenticatedUser(session);
-        return ticketService.getCompletionEvidence(ticketId, viewer).stream()
+        Role activeRole = accessControlService.requireActiveRole(viewer);
+        return ticketService.getCompletionEvidence(ticketId, viewer, activeRole).stream()
                 .map(this::createCompletionEvidenceResponse)
                 .toList();
     }
@@ -178,7 +183,8 @@ public class TicketController {
             @PathVariable("evidenceId") Long evidenceId,
             HttpSession session) {
         User viewer = accessControlService.requireAuthenticatedUser(session);
-        CompletionEvidence evidence = ticketService.getCompletionEvidenceImage(ticketId, evidenceId, viewer);
+        Role activeRole = accessControlService.requireActiveRole(viewer);
+        CompletionEvidence evidence = ticketService.getCompletionEvidenceImage(ticketId, evidenceId, viewer, activeRole);
         return ResponseEntity.ok()
                 .contentType(MediaType.parseMediaType(evidence.getContentType()))
                 .body(evidence.getImageData());
@@ -212,11 +218,12 @@ public class TicketController {
             @PathVariable("ticketId") Long ticketId,
             @RequestParam("image") MultipartFile image,
             HttpSession session) {
+        Long requesterId = getRequesterId(session);
         validateImage(image);
 
         Ticket ticket = ticketService.getTicketForUser(
                 ticketId,
-                getRequesterId(session));
+                requesterId);
 
         if (ticket.getImages().size() >= MAX_IMAGES_PER_TICKET) {
             throw new ResponseStatusException(
@@ -224,7 +231,7 @@ public class TicketController {
                     "A request cannot have more than " + MAX_IMAGES_PER_TICKET + " images");
         }
 
-        ticketService.addTicketImage(ticketId, getRequesterId(session), image);
+        ticketService.addTicketImage(ticketId, requesterId, image);
     }
 
     @DeleteMapping("/{ticketId}/images/{imageId}")
@@ -245,7 +252,8 @@ public class TicketController {
             @PathVariable("imageId") Long imageId,
             HttpSession session) {
         User viewer = accessControlService.requireAuthenticatedUser(session);
-        TicketImage image = ticketService.getTicketImage(ticketId, viewer, imageId);
+        Role activeRole = accessControlService.requireActiveRole(viewer);
+        TicketImage image = ticketService.getTicketImage(ticketId, viewer, imageId, activeRole);
 
         return ResponseEntity.ok()
                 .contentType(MediaType.parseMediaType(image.getContentType()))

@@ -4,7 +4,6 @@ import java.io.IOException;
 import java.util.List;
 import java.util.Map;
 import java.util.LinkedHashMap;
-import java.util.Comparator;
 
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
@@ -81,34 +80,29 @@ public class TicketService {
     }
 
     @Transactional(readOnly = true)
-    public List<Ticket> getTicketsForViewer(User viewer) {
-        if (canViewAllTickets(viewer)) {
-            return ticketRepository.findAllByOrderByCreatedAtDesc();
-        }
-        Map<Long, Ticket> visible = new LinkedHashMap<>();
-        if (viewer.hasRole(Role.GENERAL_USER)) {
-            getTicketsForUser(viewer.getId()).forEach(ticket -> visible.put(ticket.getId(), ticket));
-        }
-        if (viewer.hasRole(Role.MAINTENANCE_STAFF)) {
-            ticketRepository.findDistinctByAssignments_Technician_IdAndAssignments_ActiveTrueOrderByCreatedAtDesc(
-                    viewer.getId()).forEach(ticket -> visible.put(ticket.getId(), ticket));
-        }
-        if (!viewer.hasRole(Role.GENERAL_USER) && !viewer.hasRole(Role.MAINTENANCE_STAFF)) {
-            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "You cannot view maintenance requests");
-        }
-        return visible.values().stream()
-                .sorted(Comparator.comparing(Ticket::getCreatedAt).reversed()
-                        .thenComparing(Ticket::getId, Comparator.reverseOrder()))
-                .toList();
+    public List<Ticket> getTicketsForViewer(User viewer, Role activeRole) {
+        requireViewerRole(viewer, activeRole);
+        return switch (activeRole) {
+            case GENERAL_USER -> getTicketsForUser(viewer.getId());
+            case MAINTENANCE_STAFF ->
+                    ticketRepository.findDistinctByAssignments_Technician_IdAndAssignments_ActiveTrueOrderByCreatedAtDesc(
+                            viewer.getId());
+            case ADMINISTRATOR -> ticketRepository.findAllByOrderByCreatedAtDesc();
+            case MANAGER -> throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Manager is no longer a workspace role");
+        };
     }
 
     @Transactional(readOnly = true)
-    public Ticket getTicketForViewer(Long ticketId, User viewer) {
+    public Ticket getTicketForViewer(Long ticketId, User viewer, Role activeRole) {
+        requireViewerRole(viewer, activeRole);
         Ticket ticket = findTicket(ticketId);
-        boolean isOwner = ticket.getSubmittedBy().getId().equals(viewer.getId());
-        boolean isAssignedTechnician = isAssignedTo(ticket, viewer);
-
-        if (!isOwner && !isAssignedTechnician && !canViewAllTickets(viewer)) {
+        boolean canView = switch (activeRole) {
+            case GENERAL_USER -> ticket.getSubmittedBy().getId().equals(viewer.getId());
+            case MAINTENANCE_STAFF -> isAssignedTo(ticket, viewer);
+            case ADMINISTRATOR -> true;
+            case MANAGER -> false;
+        };
+        if (!canView) {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "You cannot view this ticket");
         }
 
@@ -116,16 +110,8 @@ public class TicketService {
     }
 
     @Transactional(readOnly = true)
-    public List<TicketHistory> getTicketHistory(Long ticketId, User viewer) {
-        Ticket ticket = findTicket(ticketId);
-        boolean isOwner = ticket.getSubmittedBy().getId().equals(viewer.getId());
-        boolean isAssignedTechnician = isAssignedTo(ticket, viewer);
-        boolean canViewAll = canViewAllTickets(viewer);
-
-        if (!isOwner && !isAssignedTechnician && !canViewAll) {
-            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "You cannot view this ticket history");
-        }
-
+    public List<TicketHistory> getTicketHistory(Long ticketId, User viewer, Role activeRole) {
+        getTicketForViewer(ticketId, viewer, activeRole);
         return ticketHistoryRepository.findByTicket_IdOrderByOccurredAtAscIdAsc(ticketId);
     }
 
@@ -164,11 +150,12 @@ public class TicketService {
     }
 
     @Transactional(readOnly = true)
-    public TicketPrioritySummary getPrioritySummary(User viewer) {
-        if (!canViewAllTickets(viewer)) {
+    public TicketPrioritySummary getPrioritySummary(User viewer, Role activeRole) {
+        requireViewerRole(viewer, activeRole);
+        if (activeRole != Role.ADMINISTRATOR) {
             throw new ResponseStatusException(
                     HttpStatus.FORBIDDEN,
-                    "Only administrators and managers can view the priority summary");
+                    "Only administrators can view the priority summary");
         }
 
         return new TicketPrioritySummary(
@@ -377,14 +364,14 @@ public class TicketService {
     }
 
     @Transactional(readOnly = true)
-    public List<CompletionEvidence> getCompletionEvidence(Long ticketId, User viewer) {
-        getTicketForViewer(ticketId, viewer);
+    public List<CompletionEvidence> getCompletionEvidence(Long ticketId, User viewer, Role activeRole) {
+        getTicketForViewer(ticketId, viewer, activeRole);
         return completionEvidenceRepository.findByTicketIdOrderByUploadedAtDesc(ticketId);
     }
 
     @Transactional(readOnly = true)
-    public CompletionEvidence getCompletionEvidenceImage(Long ticketId, Long evidenceId, User viewer) {
-        getTicketForViewer(ticketId, viewer);
+    public CompletionEvidence getCompletionEvidenceImage(Long ticketId, Long evidenceId, User viewer, Role activeRole) {
+        getTicketForViewer(ticketId, viewer, activeRole);
         CompletionEvidence evidence = completionEvidenceRepository.findById(evidenceId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Completion evidence not found"));
         if (!evidence.getTicket().getId().equals(ticketId)) {
@@ -510,8 +497,8 @@ public class TicketService {
     }
 
     @Transactional(readOnly = true)
-    public TicketImage getTicketImage(Long ticketId, User viewer, Long imageId) {
-        Ticket ticket = getTicketForViewer(ticketId, viewer);
+    public TicketImage getTicketImage(Long ticketId, User viewer, Long imageId, Role activeRole) {
+        Ticket ticket = getTicketForViewer(ticketId, viewer, activeRole);
 
         return ticket.getImages().stream()
                 .filter(image -> image.getId().equals(imageId))
@@ -553,16 +540,16 @@ public class TicketService {
                 || ticket.getStatus() == TicketStatus.COMPLETED;
     }
 
-    private boolean canViewAllTickets(User viewer) {
-        return viewer.hasRole(Role.ADMINISTRATOR)
-                || viewer.hasRole(Role.MANAGER);
-    }
-
     private boolean isAssignedTo(Ticket ticket, User viewer) {
         TicketAssignment assignment = ticket.getActiveAssignment();
-        return viewer.hasRole(Role.MAINTENANCE_STAFF)
-                && assignment != null
+        return assignment != null
                 && assignment.getTechnician().getId().equals(viewer.getId());
+    }
+
+    private void requireViewerRole(User viewer, Role activeRole) {
+        if (activeRole == null || !activeRole.isSelectable() || !viewer.hasRole(activeRole)) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "This role is not available for your account");
+        }
     }
 
     private boolean isAssignableTechnician(User user) {

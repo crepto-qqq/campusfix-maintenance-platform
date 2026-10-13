@@ -144,6 +144,9 @@ public class UserService {
         if (identityType == null || roles == null || roles.isEmpty() || roles.stream().anyMatch(Objects::isNull)) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Identity and at least one valid role are required");
         }
+        if (roles.stream().anyMatch(role -> !role.isSelectable())) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Manager is no longer an assignable role");
+        }
         // Serialise access updates so two administrators cannot concurrently revoke the last admins.
         lockAccessUpdates();
         User actor = findUserById(administrator.getId());

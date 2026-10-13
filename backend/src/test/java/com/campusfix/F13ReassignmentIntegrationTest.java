@@ -59,7 +59,6 @@ class F13ReassignmentIntegrationTest {
         long secondTechnicianId = register(publicClient, "F13 Second Technician", "f13.second@test.local");
         long disabledTechnicianId = register(publicClient, "F13 Disabled Technician", "f13.disabled@test.local");
         long ordinaryUserId = register(publicClient, "F13 Ordinary User", "f13.ordinary@test.local");
-        long managerId = register(publicClient, "F13 Manager", "f13.manager@test.local");
 
         HttpClient requesterClient = login("f13.requester@test.local", "password123");
         long ticketId = createTicket(requesterClient, "F13 reassignment target");
@@ -74,7 +73,6 @@ class F13ReassignmentIntegrationTest {
         updateAccess(adminClient, firstTechnicianId, "CAMPUS_STAFF", "MAINTENANCE_STAFF");
         updateAccess(adminClient, secondTechnicianId, "CAMPUS_STAFF", "MAINTENANCE_STAFF");
         updateAccess(adminClient, disabledTechnicianId, "CAMPUS_STAFF", "MAINTENANCE_STAFF");
-        updateAccess(adminClient, managerId, "CAMPUS_STAFF", "MANAGER");
         jdbcTemplate.update(
                 "UPDATE app_users SET account_status = 'DISABLED' WHERE id = ?",
                 disabledTechnicianId);
@@ -86,7 +84,6 @@ class F13ReassignmentIntegrationTest {
 
         HttpClient firstTechnicianClient = login("f13.first@test.local", "password123");
         HttpClient secondTechnicianClient = login("f13.second@test.local", "password123");
-        HttpClient managerClient = login("f13.manager@test.local", "password123");
         assertEquals(200, put(
                 firstTechnicianClient,
                 "/api/tickets/" + ticketId + "/status",
@@ -100,7 +97,6 @@ class F13ReassignmentIntegrationTest {
         assertEquals(401, post(publicClient, reassignmentPath, validReassignment).statusCode());
         assertEquals(403, post(requesterClient, reassignmentPath, validReassignment).statusCode());
         assertEquals(403, post(firstTechnicianClient, reassignmentPath, validReassignment).statusCode());
-        assertEquals(403, post(managerClient, reassignmentPath, validReassignment).statusCode());
         assertEquals(400, post(adminClient, reassignmentPath,
                 "{\"technicianId\":null,\"reason\":\"Valid reason\"}").statusCode());
         assertEquals(400, post(adminClient, reassignmentPath,

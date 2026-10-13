@@ -3,11 +3,13 @@ package com.campusfix.auth;
 import java.util.Set;
 
 import com.campusfix.user.Role;
+import com.campusfix.user.AccessControlService;
 import com.campusfix.user.IdentityType;
 import com.campusfix.user.User;
 import com.campusfix.user.UserService;
 import jakarta.servlet.http.HttpSession;
 import jakarta.validation.Valid;
+import jakarta.validation.constraints.NotNull;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.CrossOrigin;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -26,12 +28,15 @@ public class AuthController {
 
     private final UserService userService;
     private final EmailVerificationService emailVerificationService;
+    private final AccessControlService accessControlService;
 
     public AuthController(
             UserService userService,
-            EmailVerificationService emailVerificationService) {
+            EmailVerificationService emailVerificationService,
+            AccessControlService accessControlService) {
         this.userService = userService;
         this.emailVerificationService = emailVerificationService;
+        this.accessControlService = accessControlService;
     }
 
     @PostMapping("/verification-code")
@@ -64,13 +69,25 @@ public class AuthController {
             HttpSession session) {
         User user = userService.login(request.email(), request.password());
         session.setAttribute("userId", user.getId());
+        Set<Role> roles = accessControlService.supportedRoles(user);
+        Role activeRole = roles.size() == 1 ? roles.iterator().next() : null;
         return new LoginResponse(
                 user.getId(),
                 user.getName(),
                 user.getEmail(),
                 user.getIdentityType(),
                 user.getRole(),
-                user.getRoles());
+                roles,
+                activeRole);
+    }
+
+    @PostMapping("/active-role")
+    public ActiveRoleResponse selectActiveRole(
+            @Valid @RequestBody ActiveRoleRequest request,
+            HttpSession session) {
+        User user = accessControlService.requireAuthenticatedUser(session);
+        Role activeRole = accessControlService.selectRole(user, request.role());
+        return new ActiveRoleResponse(activeRole, accessControlService.supportedRoles(user));
     }
 
     @PostMapping("/logout")
@@ -94,6 +111,13 @@ public class AuthController {
             String email,
             IdentityType identityType,
             Role role,
-            Set<Role> roles) {
+            Set<Role> roles,
+            Role activeRole) {
+    }
+
+    public record ActiveRoleRequest(@NotNull Role role) {
+    }
+
+    public record ActiveRoleResponse(Role activeRole, Set<Role> roles) {
     }
 }

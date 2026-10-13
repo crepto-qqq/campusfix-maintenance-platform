@@ -13,12 +13,12 @@ F11将Requester提交的`urgency`与实际调度使用的`operationalPriority`�
 
 ## Role and Permission Matrix
 
-| Capability | Requester | Maintenance Staff | Administrator | Manager |
-|---|---:|---:|---:|---:|
-| View priority on an authorised ticket | Yes | Assigned workflow pending | Yes | Yes |
-| View priority distribution | No | No | Yes | Yes |
-| Set or change operational priority | No | No | Yes | No |
-| View priority audit history | Own tickets | Assigned workflow pending | Yes | Yes |
+| Capability | Requester | Maintenance Staff | Administrator |
+|---|---:|---:|---:|
+| View priority on an authorised ticket | Yes | Assigned tickets | Yes |
+| View priority distribution | No | No | Yes |
+| Set or change operational priority | No | No | Yes |
+| View priority audit history | Own tickets | Assigned tickets | Yes |
 
 权限由后端验证，隐藏前端按钮不是授权依据。未登录返回`401`；已登录但角色无权返回`403`。
 
@@ -42,7 +42,7 @@ Content-Type: application/json
 GET /api/tickets/priority-summary
 ```
 
-该管理汇总向Administrator和Manager返回`unclassified / low / medium / high / critical`数量，所有数量直接读取同一持久化字段，确保与工单列表和详情一致。
+该管理汇总只向活动角色为Administrator的用户返回`unclassified / low / medium / high / critical`数量，所有数量直接读取同一持久化字段，确保与工单列表和详情一致。
 
 ## Database and Audit
 
@@ -56,7 +56,7 @@ GET /api/tickets/priority-summary
 
 - Requester工单卡片同时显示`Suggested urgency`和只读`Operational priority`。
 - Administrator的All Requests中提供优先级下拉框、可选原因和Save Priority按钮。
-- Manager看到相同列表与Priority Distribution，但没有修改控件。
+- 多角色账号仅在Administrator模式看到Priority Distribution和修改控件。
 - 保存成功后列表和Priority Distribution立即重新读取后端数据。
 
 ## Acceptance Verification
@@ -64,7 +64,7 @@ GET /api/tickets/priority-summary
 | Acceptance criterion | Verification result |
 |---|---|
 | Urgency与最终优先级分离 | 创建时注入客户端`operationalPriority`会被忽略；响应仍为`null` |
-| 仅Administrator可修改 | 未登录`401`；Requester与Manager均`403`；前端无编辑控件 |
+| 仅Administrator可修改 | 未登录`401`；Requester与Maintenance Staff均`403`；非管理员模式无编辑控件 |
 | 只接受约定枚举 | `URGENT`和`null`均返回`400` |
 | 完整审计 | 已验证`UNSET → MEDIUM → HIGH`及Actor、Time、Reason |
 | 列表、详情、汇总一致 | API集成测试与真实网页测试均通过 |

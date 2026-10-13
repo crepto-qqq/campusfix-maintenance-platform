@@ -8,14 +8,14 @@ F12允许Administrator将`SUBMITTED`工单首次分配给有效且启用的`MAIN
 
 ## Role and Permission Matrix
 
-| Capability | Requester | Maintenance Staff | Administrator | Manager |
-|---|---:|---:|---:|---:|
-| View assignment on authorised ticket | Own | Assigned | All | All |
-| View assigned ticket details/history | Own | Assigned only | All | All |
-| List assignable technicians | No | No | Yes | No |
-| Create initial assignment | No | No | Yes | No |
+| Capability | Requester | Maintenance Staff | Administrator |
+|---|---:|---:|---:|
+| View assignment on authorised ticket | Own | Assigned | All |
+| View assigned ticket details/history | Own | Assigned only | All |
+| List assignable technicians | No | No | Yes |
+| Create initial assignment | No | No | Yes |
 
-所有权限由后端验证。未登录返回`401`，Requester、Maintenance Staff或Manager调用管理接口返回`403`。
+所有权限由后端按当前活动角色验证。未登录返回`401`，Requester或Maintenance Staff调用管理接口返回`403`。
 
 ## API
 
@@ -23,7 +23,7 @@ F12允许Administrator将`SUBMITTED`工单首次分配给有效且启用的`MAIN
 GET /api/tickets/technicians
 ```
 
-仅Administrator可用，只返回`account_status=ACTIVE`且当前角色为`MAINTENANCE_STAFF`的用户。
+仅Administrator模式可用，只返回`account_status=ACTIVE`且获授`MAINTENANCE_STAFF`的用户；被分派人无需当前正打开维修模式。
 
 ```text
 POST /api/tickets/{ticketId}/assignment
@@ -63,7 +63,7 @@ Content-Type: application/json
 - 下拉列表只显示有效Maintenance Staff。
 - 成功后卡片立即显示`ASSIGNED`、负责人和Assigned Time，初次分派按钮消失。
 - Maintenance Staff进入`My Assigned Requests`，只看到当前分配给自己的工单。
-- Requester和Manager可以查看分派结果，但没有分派控件。
+- Requester可在自己的工单中查看分派结果，但没有分派控件。
 - 工单进入`ASSIGNED`后，Requester的Edit和Cancel按钮消失。
 
 ## Acceptance Verification
@@ -73,7 +73,7 @@ Content-Type: application/json
 | 只分派SUBMITTED工单 | 成功路径通过；CANCELLED和CLOSED均返回`409` |
 | 状态、负责人和审计原子保存 | API、数据库表及重启验证一致 |
 | Technician有效性 | 不存在、禁用和非Technician均返回`400` |
-| 仅Administrator可分派 | Guest `401`；Requester、Technician、Manager `403` |
+| 仅Administrator可分派 | Guest `401`；Requester、Technician `403` |
 | 已分派工单必须使用F13 | 第二次初始分派返回`409`，无重复副作用 |
 | 生成F17通知事件 | `in_app_notifications`存在唯一未读`TICKET_ASSIGNED`记录 |
 | 角色数据可见性 | Assigned Technician只看到自己的已分派工单；其他Technician为`403` |

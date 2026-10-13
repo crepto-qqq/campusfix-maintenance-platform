@@ -58,7 +58,6 @@ class F12AssignmentIntegrationTest {
         long technicianId = register(publicClient, "F12 Technician", "f12.technician@test.local");
         long otherTechnicianId = register(publicClient, "F12 Other Technician", "f12.other.tech@test.local");
         long disabledTechnicianId = register(publicClient, "F12 Disabled Technician", "f12.disabled.tech@test.local");
-        long managerId = register(publicClient, "F12 Manager", "f12.manager@test.local");
 
         HttpClient requesterClient = login("f12.requester@test.local", "password123");
         long mainTicketId = createTicket(requesterClient, "F12 assignment target");
@@ -75,19 +74,16 @@ class F12AssignmentIntegrationTest {
         updateAccess(adminClient, technicianId, "CAMPUS_STAFF", "MAINTENANCE_STAFF");
         updateAccess(adminClient, otherTechnicianId, "CAMPUS_STAFF", "MAINTENANCE_STAFF");
         updateAccess(adminClient, disabledTechnicianId, "CAMPUS_STAFF", "MAINTENANCE_STAFF");
-        updateAccess(adminClient, managerId, "CAMPUS_STAFF", "MANAGER");
         jdbcTemplate.update(
                 "UPDATE app_users SET account_status = 'DISABLED' WHERE id = ?",
                 disabledTechnicianId);
 
         HttpClient technicianClient = login("f12.technician@test.local", "password123");
         HttpClient otherTechnicianClient = login("f12.other.tech@test.local", "password123");
-        HttpClient managerClient = login("f12.manager@test.local", "password123");
 
         // Only an authenticated Administrator can list assignable technicians.
         assertEquals(401, get(publicClient, "/api/tickets/technicians").statusCode());
         assertEquals(403, get(requesterClient, "/api/tickets/technicians").statusCode());
-        assertEquals(403, get(managerClient, "/api/tickets/technicians").statusCode());
         String technicians = get(adminClient, "/api/tickets/technicians").body();
         assertTrue(technicians.contains("\"id\":" + technicianId));
         assertTrue(technicians.contains("\"id\":" + otherTechnicianId));
@@ -101,7 +97,6 @@ class F12AssignmentIntegrationTest {
         assertEquals(401, post(publicClient, assignmentPath, validAssignment).statusCode());
         assertEquals(403, post(requesterClient, assignmentPath, validAssignment).statusCode());
         assertEquals(403, post(technicianClient, assignmentPath, validAssignment).statusCode());
-        assertEquals(403, post(managerClient, assignmentPath, validAssignment).statusCode());
         assertEquals(400, post(adminClient, assignmentPath, "{\"technicianId\":null}").statusCode());
         assertEquals(400, post(adminClient, assignmentPath, "{\"technicianId\":0}").statusCode());
         assertEquals(400, post(adminClient, assignmentPath, "{\"technicianId\":999999}").statusCode());
@@ -131,12 +126,10 @@ class F12AssignmentIntegrationTest {
         assertTrue(assigned.body().contains("\"assignedTechnicianName\":\"F12 Technician\""));
         assertTrue(assigned.body().contains("\"assignedAt\":"));
 
-        // Requester, Administrator, Manager and assigned Technician see the same assignment.
+        // Requester, Administrator and assigned Technician see the same assignment.
         assertTrue(get(requesterClient, "/api/tickets/" + mainTicketId).body()
                 .contains("\"assignedTechnicianId\":" + technicianId));
         assertTrue(get(adminClient, "/api/tickets").body()
-                .contains("\"assignedTechnicianId\":" + technicianId));
-        assertTrue(get(managerClient, "/api/tickets/" + mainTicketId).body()
                 .contains("\"assignedTechnicianId\":" + technicianId));
         String technicianTickets = get(technicianClient, "/api/tickets").body();
         assertTrue(technicianTickets.contains("F12 assignment target"));

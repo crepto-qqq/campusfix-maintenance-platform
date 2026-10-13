@@ -42,19 +42,21 @@ public class UserController {
     @GetMapping("/me")
     public ProfileResponse getMyProfile(HttpSession session) {
         User user = accessControlService.requireAuthenticatedUser(session);
-        return createProfileResponse(user);
+        return createProfileResponse(user, accessControlService.resolveActiveRole(user));
     }
 
     @PutMapping("/me")
     public ProfileResponse updateMyProfile(
             @Valid @RequestBody ProfileUpdateRequest request,
             HttpSession session) {
+        User currentUser = accessControlService.requireAuthenticatedUser(session);
+        Role activeRole = accessControlService.requireActiveRole(currentUser);
         User user = userService.updateProfile(
-                accessControlService.requireAuthenticatedUser(session).getId(),
+                currentUser.getId(),
                 request.name(),
                 request.contactInformation(),
                 request.profileDetails());
-        return createProfileResponse(user);
+        return createProfileResponse(user, activeRole);
     }
 
     @PostMapping(value = "/me/avatar", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
@@ -62,11 +64,13 @@ public class UserController {
     public void uploadMyAvatar(
             @RequestParam("avatar") MultipartFile avatar,
             HttpSession session) {
+        User user = accessControlService.requireAuthenticatedUser(session);
+        accessControlService.requireActiveRole(user);
         validateAvatar(avatar);
 
         try {
             userService.updateAvatar(
-                    accessControlService.requireAuthenticatedUser(session).getId(),
+                    user.getId(),
                     avatar.getBytes(),
                     avatar.getContentType());
         } catch (IOException exception) {
@@ -77,6 +81,7 @@ public class UserController {
     @GetMapping("/me/avatar")
     public ResponseEntity<byte[]> getMyAvatar(HttpSession session) {
         User user = accessControlService.requireAuthenticatedUser(session);
+        accessControlService.requireActiveRole(user);
 
         if (user.getAvatarData() == null || user.getAvatarContentType() == null) {
             throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Avatar not found");
@@ -102,14 +107,15 @@ public class UserController {
         }
     }
 
-    private ProfileResponse createProfileResponse(User user) {
+    private ProfileResponse createProfileResponse(User user, Role activeRole) {
         return new ProfileResponse(
                 user.getId(),
                 user.getEmail(),
                 user.getName(),
                 user.getIdentityType(),
-                user.getRole(),
-                user.getRoles(),
+                activeRole,
+                accessControlService.supportedRoles(user),
+                activeRole,
                 user.getContactInformation(),
                 user.getProfileDetails());
     }
@@ -121,6 +127,7 @@ public class UserController {
             IdentityType identityType,
             Role role,
             Set<Role> roles,
+            Role activeRole,
             String contactInformation,
             String profileDetails) {
     }

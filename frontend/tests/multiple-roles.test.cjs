@@ -5,24 +5,30 @@ const vm = require('node:vm');
 const path = require('node:path');
 
 const source = fs.readFileSync(path.join(__dirname, '../js/app.js'), 'utf8');
-function page() {
+function page({ extraIds = [], omitIds = [], fetchImpl = undefined, storage = undefined,
+  sharedStorage = undefined, windowName = undefined } = {}) {
   const ids = ['workspace-role', 'admin-link', 'role-workspace-message', 'role-workspace-title',
     'role-workspace-description', 'all-requests-section', 'all-requests-title', 'all-requests-description',
-    'tickets-message', 'tickets-list', 'all-tickets-message', 'all-tickets-list', 'admin-message'];
-  const elements = Object.fromEntries(ids.map(id => [id, {
-    hidden: true, textContent: '', innerHTML: '', children: [],
-    appendChild(child) { this.children.push(child); }
-  }]));
+    'tickets-message', 'tickets-list', 'all-tickets-message', 'all-tickets-list', 'admin-message',
+    ...extraIds].filter(id => !omitIds.includes(id));
+  const elements = Object.fromEntries(ids.map(id => [id, richElement({ hidden: true })]));
   const requesterSections = [{ hidden: true }, { hidden: true }];
+  const windowListeners = {};
   const context = vm.createContext({
-    window: { location: { hostname: '127.0.0.1' } },
+    window: {
+      location: { hostname: '127.0.0.1', href: '' }, sessionStorage: storage,
+      localStorage: sharedStorage, name: windowName,
+      addEventListener(name, listener) { windowListeners[name] = listener; }
+    },
+    fetch: fetchImpl,
     document: {
       getElementById: id => elements[id] ?? null,
       querySelectorAll: () => requesterSections
     }
   });
   vm.runInContext(source, context);
-  return { context, elements, requesterSections, run: code => vm.runInContext(code, context) };
+  return { context, elements, requesterSections, windowListeners,
+    run: code => vm.runInContext(code, context) };
 }
 
 function richElement(initial = {}) {
@@ -34,6 +40,7 @@ function richElement(initial = {}) {
     dataset: {},
     children: [],
     attributes: {},
+    listeners: {},
     classList: {
       add: (...names) => names.forEach(name => classes.add(name)),
       remove: (...names) => names.forEach(name => classes.delete(name)),
@@ -41,13 +48,25 @@ function richElement(initial = {}) {
     },
     appendChild(child) { this.children.push(child); },
     setAttribute(name, value) { this.attributes[name] = String(value); },
+    addEventListener(name, listener) { this.listeners[name] = listener; },
+    querySelectorAll(selector) { return this.queryResults?.[selector] ?? []; },
     ...initial
   };
 }
 
-test('requester + technician sees both work areas and only their tickets in each area', async () => {
+function memoryStorage(initial = {}) {
+  const values = new Map(Object.entries(initial));
+  return {
+    getItem: key => values.get(key) ?? null,
+    setItem: (key, value) => values.set(key, String(value)),
+    removeItem: key => values.delete(key)
+  };
+}
+
+test('student mode shows only owned work even when the account has technician access', async () => {
   const p = page();
-  p.context.testUser = { id: 10, role: 'MAINTENANCE_STAFF', roles: ['GENERAL_USER', 'MAINTENANCE_STAFF'] };
+  p.context.testUser = { id: 10, role: 'MAINTENANCE_STAFF',
+    roles: ['GENERAL_USER', 'MAINTENANCE_STAFF'], activeRole: 'GENERAL_USER' };
   p.context.testTickets = [
     { id: 1, submittedById: 10, assignedTechnicianId: null },
     { id: 2, submittedById: 20, assignedTechnicianId: 10 },
@@ -61,17 +80,16 @@ test('requester + technician sees both work areas and only their tickets in each
   `);
   await p.run('initWorkspace()');
   assert.deepEqual(Array.from(p.context.ownIds), [1, 3]);
-  assert.deepEqual(Array.from(p.context.assignedIds), [2, 3]);
+  assert.equal(p.context.assignedIds, undefined);
   assert.ok(p.requesterSections.every(s => !s.hidden));
-  assert.equal(p.elements['all-requests-section'].hidden, false);
+  assert.equal(p.elements['all-requests-section'].hidden, true);
   assert.equal(p.elements['admin-link'].hidden, true);
-  assert.match(p.elements['workspace-role'].textContent, /Requester/);
-  assert.match(p.elements['workspace-role'].textContent, /Maintenance Staff/);
+  assert.equal(p.elements['workspace-role'].textContent, 'Student');
 });
 
-test('admin + technician can manage requests but only update status on their assigned tickets', () => {
+test('administrator and technician modes never show combined ticket actions', () => {
   const p = page();
-  p.context.user = { id: 10, roles: ['ADMINISTRATOR', 'MAINTENANCE_STAFF'] };
+  p.context.user = { id: 10, roles: ['ADMINISTRATOR', 'MAINTENANCE_STAFF'], activeRole: 'ADMINISTRATOR' };
   p.run(`
     currentWorkspaceUser = user;
     renderTicket = (ticket, readOnly, priority, assign, status) => ({ id: ticket.id, priority, assign, status });
@@ -80,28 +98,258 @@ test('admin + technician can manage requests but only update status on their ass
   `);
   const cards = p.elements['all-tickets-list'].children;
   assert.ok(cards.every(card => card.priority && card.assign));
-  assert.equal(cards[0].status, true);
+  assert.equal(cards[0].status, false);
   assert.equal(cards[1].status, false);
   assert.equal(p.elements['admin-link'].hidden, false);
+  assert.equal(p.elements['workspace-role'].textContent, 'Administrator');
+
+  p.elements['all-tickets-list'].children = [];
+  p.run(`
+    user.activeRole = 'MAINTENANCE_STAFF';
+    displayWorkspaceRole(user);
+    renderAllTickets([{id: 1, assignedTechnicianId: 10}, {id: 2, assignedTechnicianId: 20}]);
+  `);
+  const technicianCards = p.elements['all-tickets-list'].children;
+  assert.equal(technicianCards[0].priority, false);
+  assert.equal(technicianCards[0].assign, false);
+  assert.equal(technicianCards[0].status, true);
+  assert.equal(technicianCards[1].status, false);
+  assert.equal(p.elements['admin-link'].hidden, true);
+  assert.equal(p.elements['workspace-role'].textContent, 'Maintenance Staff');
 });
 
-test('manager alone gets read-only cards, no requester form or administrator link', async () => {
+test('single student mode has no administrative or technician area', async () => {
   const p = page();
-  p.context.user = { id: 10, roles: ['MANAGER'] };
+  p.context.user = { id: 10, roles: ['GENERAL_USER'], activeRole: 'GENERAL_USER' };
   p.run(`
     loadCurrentUser = async () => user;
-    loadPrioritySummary = async () => {};
     fetch = async () => ({ ok: true, status: 200, json: async () => [{id: 1, assignedTechnicianId: 10}] });
-    renderTicket = (ticket, readOnly, priority, assign, status) => ({ readOnly, priority, assign, status });
+    renderTickets = tickets => { ownIds = tickets.map(ticket => ticket.id); };
   `);
   await p.run('initWorkspace()');
-  assert.ok(p.requesterSections.every(s => s.hidden));
-  const card = p.elements['all-tickets-list'].children[0];
-  assert.equal(card.readOnly, true);
-  assert.equal(card.priority, false);
-  assert.equal(card.assign, false);
-  assert.equal(card.status, false);
+  assert.ok(p.requesterSections.every(s => !s.hidden));
+  assert.equal(p.elements['all-requests-section'].hidden, true);
+  assert.equal(p.context.assignedIds, undefined);
   assert.equal(p.elements['admin-link'].hidden, true);
+});
+
+test('login requires a role choice before opening a multi-role dashboard', async () => {
+  const requests = [];
+  const granted = { id: 10, name: 'Dual User', roles: ['GENERAL_USER', 'MAINTENANCE_STAFF'],
+    activeRole: null };
+  const fetchImpl = async (url, options = {}) => {
+    requests.push({ url, options });
+    if (url.endsWith('/users/me')) return { ok: false, status: 401 };
+    if (url.endsWith('/auth/login')) return { ok: true, status: 200, json: async () => granted };
+    if (url.endsWith('/auth/active-role')) {
+      return { ok: true, status: 200, json: async () => ({ activeRole: 'GENERAL_USER', roles: granted.roles }) };
+    }
+    throw new Error(`Unexpected request: ${url}`);
+  };
+  const storage = memoryStorage({ 'campusfix.roleTabId': 'test-tab' });
+  const p = page({
+    omitIds: ['workspace-page'], fetchImpl, storage, windowName: 'test-tab',
+    extraIds: ['login-form', 'login-section', 'login-email', 'login-password', 'auth-message',
+      'role-selection-section', 'role-selection-options', 'role-selection-message']
+  });
+  const studentButton = richElement({ dataset: { role: 'GENERAL_USER' } });
+  p.elements['role-selection-options'].queryResults = {
+    'button[data-role]': [studentButton], button: [studentButton]
+  };
+  p.elements['login-email'].value = 'dual@test.local';
+  p.elements['login-password'].value = 'password123';
+  await p.elements['login-form'].listeners.submit({ preventDefault() {} });
+
+  assert.equal(p.elements['login-section'].hidden, true);
+  assert.equal(p.elements['role-selection-section'].hidden, false);
+  assert.match(p.elements['role-selection-options'].innerHTML, /GENERAL_USER/);
+  assert.match(p.elements['role-selection-options'].innerHTML, /MAINTENANCE_STAFF/);
+  assert.doesNotMatch(p.elements['role-selection-options'].innerHTML, /MANAGER/);
+  assert.equal(p.context.window.location.href, '');
+
+  await studentButton.listeners.click();
+  assert.equal(JSON.parse(storage.getItem('campusfix.activeRole')).role, 'GENERAL_USER');
+  assert.equal(p.context.window.location.href, './workspace.html');
+  assert.deepEqual(JSON.parse(requests.find(request => request.url.endsWith('/auth/active-role')).options.body),
+    { role: 'GENERAL_USER' });
+});
+
+test('dashboard switcher changes one visible role and restores it across pages in the same tab', async () => {
+  const requests = [];
+  const storage = memoryStorage({ 'campusfix.roleTabId': 'same-tab' });
+  const sharedStorage = memoryStorage();
+  const user = { id: 10, name: 'Three Roles',
+    roles: ['GENERAL_USER', 'MAINTENANCE_STAFF', 'ADMINISTRATOR'], activeRole: 'GENERAL_USER' };
+  const fetchImpl = async (url, options = {}) => {
+    requests.push({ url, options });
+    if (url.endsWith('/auth/active-role')) {
+      return { ok: true, status: 200,
+        json: async () => ({ activeRole: JSON.parse(options.body).role, roles: user.roles }) };
+    }
+    if (url.endsWith('/users/me')) {
+      return { ok: true, status: 200,
+        json: async () => ({ ...user, activeRole: options.headers?.['X-Active-Role'] ?? null }) };
+    }
+    throw new Error(`Unexpected request: ${url}`);
+  };
+  const p = page({
+    omitIds: ['workspace-page'], fetchImpl, storage, sharedStorage, windowName: 'same-tab',
+    extraIds: ['dashboard-role-switcher', 'dashboard-role-select', 'dashboard-role-message',
+      'dashboard-metrics', 'dashboard-tickets']
+  });
+  p.context.user = user;
+  p.run(`
+    loadedRoles = [];
+    loadDashboardData = async selectedUser => { loadedRoles.push(selectedUser.activeRole); };
+    currentWorkspaceUser = user;
+    setupDashboardRoleSwitcher(user);
+    displayWorkspaceRole(user);
+  `);
+  const selector = p.elements['dashboard-role-select'];
+  assert.equal(p.elements['dashboard-role-switcher'].hidden, false);
+  assert.equal(selector.value, 'GENERAL_USER');
+  assert.doesNotMatch(selector.innerHTML, /MANAGER/);
+  assert.equal(p.elements['workspace-role'].textContent, 'Student');
+
+  selector.value = 'MAINTENANCE_STAFF';
+  await selector.listeners.change();
+  assert.equal(p.elements['workspace-role'].textContent, 'Maintenance Staff');
+  assert.equal(p.elements['admin-link'].hidden, true);
+  assert.equal(p.run("hasRole(currentWorkspaceUser, 'GENERAL_USER')"), false);
+  assert.equal(p.run("hasRole(currentWorkspaceUser, 'MAINTENANCE_STAFF')"), true);
+
+  selector.value = 'ADMINISTRATOR';
+  await selector.listeners.change();
+  assert.equal(p.elements['workspace-role'].textContent, 'Administrator');
+  assert.equal(p.elements['admin-link'].hidden, false);
+  assert.equal(p.run("hasRole(currentWorkspaceUser, 'MAINTENANCE_STAFF')"), false);
+  assert.deepEqual(Array.from(p.context.loadedRoles), ['MAINTENANCE_STAFF', 'ADMINISTRATOR']);
+  assert.equal(JSON.parse(storage.getItem('campusfix.activeRole')).role, 'ADMINISTRATOR');
+  assert.equal(sharedStorage.getItem('campusfix.authEvent'), null);
+
+  const nextPage = page({ omitIds: ['workspace-page'], fetchImpl, storage,
+    sharedStorage, windowName: 'same-tab' });
+  const restored = await nextPage.run('loadCurrentUser()');
+  assert.equal(restored.activeRole, 'ADMINISTRATOR');
+  assert.equal(requests.at(-1).options.headers['X-Active-Role'], 'ADMINISTRATOR');
+});
+
+test('a delayed focus check cannot overwrite a dashboard role switch', async () => {
+  const storage = memoryStorage({
+    'campusfix.roleTabId': 'focus-tab',
+    'campusfix.activeRole': JSON.stringify({ userId: 10, role: 'GENERAL_USER' })
+  });
+  const user = { id: 10, roles: ['GENERAL_USER', 'MAINTENANCE_STAFF'],
+    activeRole: 'GENERAL_USER' };
+  let releaseProfile;
+  const delayedProfile = new Promise(resolve => { releaseProfile = resolve; });
+  const requests = [];
+  const p = page({ omitIds: ['workspace-page'], storage, windowName: 'focus-tab',
+    extraIds: ['dashboard-role-switcher', 'dashboard-role-select', 'dashboard-role-message',
+      'dashboard-metrics', 'dashboard-tickets'],
+    fetchImpl: async (url, options = {}) => {
+      requests.push({ url, options });
+      if (url.endsWith('/users/me')) return delayedProfile;
+      if (url.endsWith('/auth/active-role')) return { ok: true, status: 200,
+        json: async () => ({ activeRole: JSON.parse(options.body).role, roles: user.roles }) };
+      throw new Error(`Unexpected request: ${url}`);
+    } });
+  p.context.user = user;
+  p.run(`
+    currentWorkspaceUser = user;
+    loadDashboardData = async () => {};
+    displayWorkspaceRole(user);
+    setupDashboardRoleSwitcher(user);
+  `);
+
+  const focusCheck = p.windowListeners.focus();
+  assert.equal(requests[0].options.headers['X-Active-Role'], 'GENERAL_USER');
+  const selector = p.elements['dashboard-role-select'];
+  selector.value = 'MAINTENANCE_STAFF';
+  await selector.listeners.change();
+  releaseProfile({ ok: true, status: 200, json: async () => user });
+  await focusCheck;
+
+  assert.equal(p.run('getActiveRole(currentWorkspaceUser)'), 'MAINTENANCE_STAFF');
+  assert.equal(JSON.parse(storage.getItem('campusfix.activeRole')).role, 'MAINTENANCE_STAFF');
+  assert.equal(p.elements['workspace-role'].textContent, 'Maintenance Staff');
+  assert.equal(p.context.window.location.href, '');
+});
+
+test('a cloned new tab discards the other tab role choice', () => {
+  const cloned = memoryStorage({
+    'campusfix.roleTabId': 'original-tab',
+    'campusfix.activeRole': JSON.stringify({ userId: 10, role: 'ADMINISTRATOR' })
+  });
+  const p = page({ omitIds: ['workspace-page'], storage: cloned, windowName: '' });
+  assert.equal(p.run('readStoredRole()'), null);
+  assert.equal(cloned.getItem('campusfix.activeRole'), null);
+});
+
+test('an account change in another tab clears the old workspace while a role switch stays local', async () => {
+  const storage = memoryStorage({
+    'campusfix.roleTabId': 'old-tab',
+    'campusfix.activeRole': JSON.stringify({ userId: 10, role: 'GENERAL_USER' })
+  });
+  const sharedStorage = memoryStorage();
+  const p = page({ omitIds: ['workspace-page'], storage, sharedStorage, windowName: 'old-tab',
+    extraIds: ['main-content'] });
+  p.context.oldUser = { id: 10, roles: ['GENERAL_USER'], activeRole: 'GENERAL_USER' };
+  p.elements['main-content'].hidden = false;
+  p.run('currentWorkspaceUser = oldUser; displayWorkspaceRole(oldUser);');
+  p.windowListeners.storage({ key: 'unrelated', newValue: '{}' });
+  assert.equal(p.elements['main-content'].hidden, false);
+
+  p.windowListeners.storage({ key: 'campusfix.authEvent',
+    newValue: JSON.stringify({ type: 'login', userId: 20, nonce: 'other-tab' }) });
+  assert.equal(storage.getItem('campusfix.activeRole'), null);
+  assert.equal(p.elements['main-content'].hidden, true);
+  assert.equal(p.elements['workspace-role'].hidden, true);
+  assert.equal(p.context.window.location.href, './index.html');
+
+  const focusedStorage = memoryStorage({
+    'campusfix.roleTabId': 'focused-tab',
+    'campusfix.activeRole': JSON.stringify({ userId: 10, role: 'GENERAL_USER' })
+  });
+  const focused = page({ omitIds: ['workspace-page'], storage: focusedStorage,
+    windowName: 'focused-tab', extraIds: ['main-content'],
+    fetchImpl: async () => ({ ok: true, status: 200,
+      json: async () => ({ id: 20, roles: ['GENERAL_USER'], activeRole: 'GENERAL_USER' }) }) });
+  focused.context.oldUser = { id: 10, roles: ['GENERAL_USER'], activeRole: 'GENERAL_USER' };
+  focused.elements['main-content'].hidden = false;
+  focused.run('currentWorkspaceUser = oldUser; displayWorkspaceRole(oldUser);');
+  await focused.windowListeners.focus();
+  assert.equal(focused.elements['main-content'].hidden, true);
+  assert.equal(focusedStorage.getItem('campusfix.activeRole'), null);
+  assert.equal(focused.context.window.location.href, './index.html');
+});
+
+test('revoking the active administrator role hides stale content and opens the sole remaining role', async () => {
+  const storage = memoryStorage({
+    'campusfix.roleTabId': 'revoked-tab',
+    'campusfix.activeRole': JSON.stringify({ userId: 10, role: 'ADMINISTRATOR' })
+  });
+  const requests = [];
+  const p = page({ omitIds: ['workspace-page'], storage, windowName: 'revoked-tab',
+    extraIds: ['main-content'],
+    fetchImpl: async (url, options = {}) => {
+      requests.push({ url, options });
+      if (url.endsWith('/tickets')) return { ok: false, status: 409 };
+      if (url.endsWith('/users/me')) return { ok: true, status: 200,
+        json: async () => ({ id: 10, roles: ['GENERAL_USER'], activeRole: 'GENERAL_USER' }) };
+      throw new Error(`Unexpected request: ${url}`);
+    } });
+  p.context.admin = { id: 10, roles: ['GENERAL_USER', 'ADMINISTRATOR'],
+    activeRole: 'ADMINISTRATOR' };
+  p.elements['main-content'].hidden = false;
+  p.run('currentWorkspaceUser = admin; displayWorkspaceRole(admin);');
+
+  await assert.rejects(p.run("apiRequest('/tickets')"), /active role changed/i);
+  assert.equal(requests[0].options.headers['X-Active-Role'], 'ADMINISTRATOR');
+  assert.equal(p.elements['main-content'].hidden, true);
+  assert.equal(p.elements['workspace-role'].hidden, true);
+  assert.equal(JSON.parse(storage.getItem('campusfix.activeRole')).role, 'GENERAL_USER');
+  assert.equal(p.context.window.location.href, './workspace.html');
 });
 
 
@@ -181,9 +429,9 @@ test('completed and closed remain independent status filters and dashboard count
   assert.equal(p.run("matchesStatusFilter({status: 'CLOSED'}, 'COMPLETED')"), false);
   assert.equal(p.run("matchesStatusFilter({status: 'CLOSED'}, 'CLOSED')"), true);
 
-  p.context.manager = { roles: ['MANAGER'] };
+  p.context.student = { roles: ['GENERAL_USER'], activeRole: 'GENERAL_USER' };
   p.context.finishedTickets = [{ status: 'COMPLETED' }, { status: 'CLOSED' }];
-  const metrics = p.run('dashboardMetricsFor(manager, finishedTickets)');
+  const metrics = p.run('dashboardMetricsFor(student, finishedTickets)');
   assert.equal(metrics.at(-1)[0], 'Completed');
   assert.equal(metrics.at(-1)[1], 1);
 });
@@ -281,7 +529,7 @@ test('dashboard and request failures clear loading placeholders', async () => {
   p.elements['requests-message'] = richElement();
   p.elements['requests-list'] = richElement({ innerHTML: 'Loading requests' });
   p.elements['requests-count'] = richElement({ textContent: 'Loading…' });
-  p.context.user = { id: 1, roles: ['MANAGER'] };
+  p.context.user = { id: 1, roles: ['GENERAL_USER'], activeRole: 'GENERAL_USER' };
   p.run('getVisibleTickets = async () => { throw new Error("Network unavailable"); };');
 
   await p.run('loadDashboardData(user)');
