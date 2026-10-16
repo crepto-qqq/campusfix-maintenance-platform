@@ -4,6 +4,10 @@ import java.io.IOException;
 import java.util.List;
 import java.util.Map;
 import java.util.LinkedHashMap;
+import java.util.Comparator;
+
+import com.campusfix.review.ReviewService;
+import com.campusfix.review.ReviewService.RatingSummary;
 
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
@@ -27,18 +31,24 @@ public class TicketService {
     private final UserRepository userRepository;
     private final InAppNotificationRepository notificationRepository;
     private final CompletionEvidenceRepository completionEvidenceRepository;
+    private final TicketAssignmentRepository assignmentRepository;
+    private final ReviewService reviewService;
 
     public TicketService(
             TicketRepository ticketRepository,
             TicketHistoryRepository ticketHistoryRepository,
             UserRepository userRepository,
             InAppNotificationRepository notificationRepository,
-            CompletionEvidenceRepository completionEvidenceRepository) {
+            CompletionEvidenceRepository completionEvidenceRepository,
+            TicketAssignmentRepository assignmentRepository,
+            ReviewService reviewService) {
         this.ticketRepository = ticketRepository;
         this.ticketHistoryRepository = ticketHistoryRepository;
         this.userRepository = userRepository;
         this.notificationRepository = notificationRepository;
         this.completionEvidenceRepository = completionEvidenceRepository;
+        this.assignmentRepository = assignmentRepository;
+        this.reviewService = reviewService;
     }
 
     @Transactional
@@ -167,12 +177,28 @@ public class TicketService {
     }
 
     @Transactional(readOnly = true)
-    public List<User> getAssignableTechnicians(User administrator) {
+    public List<TechnicianCandidate> getAssignableTechnicians(User administrator) {
         requireAdministrator(administrator);
+        Map<Long, RatingSummary> ratings = reviewService.ratingSummaries();
         return userRepository.findAllWithAccessOrderByNameAndEmail().stream()
                 .filter(this::isAssignableTechnician)
+                .map(user -> {
+                    RatingSummary rating = ratings.getOrDefault(user.getId(),
+                            new RatingSummary(null, 0, 3.5));
+                    long openAssignments = assignmentRepository.countOpenForTechnician(user.getId(),
+                            List.of(TicketStatus.ASSIGNED, TicketStatus.IN_PROGRESS, TicketStatus.REOPENED));
+                    return new TechnicianCandidate(user, rating.averageRating(), rating.ratingCount(),
+                            rating.rankingScore(), openAssignments, openAssignments == 0);
+                })
+                .sorted(Comparator.comparing(TechnicianCandidate::available).reversed()
+                        .thenComparing(TechnicianCandidate::rankingScore, Comparator.reverseOrder())
+                        .thenComparing(candidate -> candidate.user().getName(), String.CASE_INSENSITIVE_ORDER)
+                        .thenComparing(candidate -> candidate.user().getId()))
                 .toList();
     }
+
+    public record TechnicianCandidate(User user, Double averageRating, long ratingCount,
+            double rankingScore, long openAssignmentCount, boolean available) {}
 
     @Transactional
     public Ticket assignTicket(Long ticketId, Long technicianId, User administrator) {

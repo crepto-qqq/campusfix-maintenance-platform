@@ -39,8 +39,8 @@ public class InAppNotification {
     @JoinColumn(name = "actor_id", nullable = false)
     private User actor;
 
-    @ManyToOne(fetch = FetchType.LAZY, optional = false)
-    @JoinColumn(name = "ticket_id", nullable = false)
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "ticket_id")
     private Ticket ticket;
 
     @Enumerated(EnumType.STRING)
@@ -115,5 +115,11 @@ public class InAppNotification {
 
     public boolean isRead() {
         return readAt != null;
+    }
+
+    public void markRead() {
+        if (readAt == null) {
+            readAt = LocalDateTime.now();
+        }
     }
 }

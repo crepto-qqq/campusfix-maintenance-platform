@@ -57,6 +57,7 @@ let previewObjectUrls = [];
 let lastLightboxTrigger = null;
 let loginSubmissionStarted = false;
 let dashboardLoadVersion = 0;
+let notificationCountVersion = 0;
 const SELECTABLE_ROLES = ['GENERAL_USER', 'ADMINISTRATOR', 'MAINTENANCE_STAFF'];
 const ACTIVE_ROLE_STORAGE_KEY = 'campusfix.activeRole';
 const ROLE_TAB_ID_KEY = 'campusfix.roleTabId';
@@ -332,6 +333,9 @@ async function requireCurrentUser() {
   currentWorkspaceUser = user;
   displayWorkspaceRole(user);
   applyRoleVisibility(user);
+  if (document.getElementById('notifications-unread-count')) {
+    loadUnreadCount().catch(() => {});
+  }
   return user;
 }
 
@@ -359,6 +363,36 @@ function applyRoleVisibility(user) {
 }
 
 function setupAppShell() {
+  const nav = document.querySelector?.('.app-nav');
+  if (nav && !document.getElementById('notifications-link')) {
+    const profileLink = nav.querySelector('a[href="./profile.html"]');
+    const links = [
+      ['reviews-link', './reviews.html', '★', 'Technician reviews', 'GENERAL_USER'],
+      ['review-admin-link', './review-admin.html', '★', 'Review moderation', 'ADMINISTRATOR'],
+      ['notifications-link', './notifications.html', '♧', 'Notifications', null]
+    ];
+    links.forEach(([id, href, icon, label, role]) => {
+      const link = document.createElement('a');
+      link.id = id;
+      link.className = `app-nav-link${pageName === (id === 'reviews-link' ? 'reviews' : id === 'review-admin-link' ? 'review-admin' : 'notifications') ? ' is-active' : ''}`;
+      link.href = href;
+      if (role) {
+        link.dataset.requiresRole = role;
+        link.hidden = true;
+      }
+      if (link.classList.contains('is-active')) link.setAttribute('aria-current', 'page');
+      link.innerHTML = `<span aria-hidden="true">${icon}</span><span>${label}</span>`;
+      if (id === 'notifications-link') {
+        const badge = document.createElement('span');
+        badge.id = 'notifications-unread-count';
+        badge.className = 'nav-count';
+        badge.hidden = true;
+        badge.setAttribute('aria-label', 'Unread notifications');
+        link.appendChild(badge);
+      }
+      nav.insertBefore(link, profileLink);
+    });
+  }
   const sidebarToggle = document.getElementById('sidebar-toggle');
   const sidebar = document.getElementById('app-sidebar');
   const sidebarBackdrop = document.getElementById('sidebar-backdrop');
@@ -754,8 +788,13 @@ function setupDashboardRoleSwitcher(user) {
       }
       displayWorkspaceRole(selectedUser);
       applyRoleVisibility(selectedUser);
+      if (document.getElementById('notifications-unread-count')) {
+        loadUnreadCount().catch(() => {});
+      }
       setText(message, `Viewing as ${formatRole(next)}.`);
+      const averageLoad = loadTechnicianAverage(selectedUser);
       await loadDashboardData(selectedUser);
+      await averageLoad;
     } catch (error) {
       select.value = previous;
       setText(message, error.message);
@@ -770,6 +809,29 @@ async function initDashboard() {
   if (!user) return;
   setupDashboardRoleSwitcher(user);
   await loadDashboardData(user);
+  await loadTechnicianAverage(user);
+}
+
+async function loadTechnicianAverage(user = currentWorkspaceUser) {
+  const section = document.getElementById('technician-rating-section');
+  const summary = document.getElementById('technician-rating-summary');
+  if (!section || !summary) return;
+  const isTechnician = hasRole(user, 'MAINTENANCE_STAFF');
+  section.hidden = !isTechnician;
+  summary.textContent = '';
+  if (!isTechnician) return;
+  setText(summary, 'Loading your average rating...');
+  try {
+    const rating = await fetchJson('/reviews/me/average', 'Loading your average rating failed');
+    if (String(currentWorkspaceUser?.id) !== String(user?.id)
+        || getActiveRole(currentWorkspaceUser) !== 'MAINTENANCE_STAFF') return;
+    summary.textContent = rating.averageRating == null
+      ? 'No ratings yet'
+      : `${formatRating(rating.averageRating)} / 5`;
+  } catch (error) {
+    if (String(currentWorkspaceUser?.id) === String(user?.id)
+        && getActiveRole(currentWorkspaceUser) === 'MAINTENANCE_STAFF') setText(summary, error.message);
+  }
 }
 
 function getRequestFilters() {
@@ -1012,10 +1074,54 @@ function renderTicketMetadata(ticket) {
 }
 
 function createTechnicianOptions(excludedTechnicianId = null) {
-  return availableTechnicians
-    .filter((technician) => technician.id !== excludedTechnicianId)
+  return sortedTechnicianCandidates(excludedTechnicianId)
     .map((technician) => `<option value="${technician.id}">${escapeHtml(technician.name)} (${escapeHtml(technician.email)})</option>`)
     .join('');
+}
+
+function formatRating(value) {
+  const number = Number(value);
+  return Number.isFinite(number) ? number.toFixed(1) : '—';
+}
+
+function technicianWorkload(technician) {
+  return Math.max(0, Number(technician.openAssignmentCount) || 0);
+}
+
+function technicianRankingScore(technician) {
+  const supplied = technician.rankingScore == null ? NaN : Number(technician.rankingScore);
+  if (Number.isFinite(supplied)) return supplied;
+  const count = Math.max(0, Number(technician.ratingCount) || 0);
+  const average = Number(technician.averageRating) || 0;
+  return (3.5 * 5 + average * count) / (5 + count);
+}
+
+function sortedTechnicianCandidates(excludedTechnicianId = null) {
+  return availableTechnicians
+    .filter((technician) => String(technician.id) !== String(excludedTechnicianId))
+    .sort((left, right) => {
+      const workloadDifference = (technicianWorkload(left) > 0 ? 1 : 0)
+        - (technicianWorkload(right) > 0 ? 1 : 0);
+      return workloadDifference || technicianRankingScore(right) - technicianRankingScore(left)
+        || String(left.name).localeCompare(String(right.name)) || Number(left.id) - Number(right.id);
+    });
+}
+
+function renderTechnicianCandidates(selectId, excludedTechnicianId = null) {
+  const candidates = sortedTechnicianCandidates(excludedTechnicianId);
+  if (!candidates.length) return '<p class="muted-copy">No eligible maintenance staff are available.</p>';
+  return `<div class="technician-candidate-list" aria-label="Suggested maintenance staff">${candidates.map((technician) => {
+    const count = Math.max(0, Number(technician.ratingCount) || 0);
+    const workload = technicianWorkload(technician);
+    return `<div class="technician-candidate">
+      <button type="button" class="technician-candidate-select" data-select="${selectId}" data-technician-id="${technician.id}">
+        <strong>${escapeHtml(technician.name)}</strong>
+        <span>${workload === 0 ? 'No unfinished assignments' : `${workload} unfinished assignment${workload === 1 ? '' : 's'}`}</span>
+        <small>${count ? `${formatRating(technician.averageRating)} / 5 · ${count} rating${count === 1 ? '' : 's'}` : 'No ratings yet'}</small>
+      </button>
+      <a class="text-link" href="./review-admin.html?technicianId=${encodeURIComponent(technician.id)}">Reviews</a>
+    </div>`;
+  }).join('')}</div>`;
 }
 
 function createPriorityOptions(selectedPriority) {
@@ -1033,6 +1139,8 @@ function renderDetailActions(ticket, user) {
         <p>Choose who should handle this request.</p>
         <label for="detail-technician">Maintenance staff</label>
         <select id="detail-technician"><option value="">Select technician</option>${createTechnicianOptions()}</select>
+        <p class="muted-copy">No unfinished assignments are listed first, followed by staff with active work. Ratings inform the order; you choose the assignee.</p>
+        ${renderTechnicianCandidates('detail-technician')}
         <button id="detail-assign" type="button">Assign technician</button>
         <p id="detail-assignment-message" class="detail-message" role="status"></p>
       </section>`);
@@ -1044,6 +1152,7 @@ function renderDetailActions(ticket, user) {
         <h3>Reassign technician</h3>
         <label for="detail-reassignment-technician">New maintenance staff</label>
         <select id="detail-reassignment-technician"><option value="">Select a different technician</option>${createTechnicianOptions(ticket.assignedTechnicianId)}</select>
+        ${renderTechnicianCandidates('detail-reassignment-technician', ticket.assignedTechnicianId)}
         <label for="detail-reassignment-reason">Reason</label>
         <textarea id="detail-reassignment-reason" maxlength="1000" rows="3" required></textarea>
         <button id="detail-reassign" type="button" class="secondary-button">Reassign</button>
@@ -1092,6 +1201,29 @@ function renderDetailActions(ticket, user) {
         <button id="detail-cancel-request" type="button" class="secondary-danger">Cancel request</button>
         <p id="detail-owner-message" class="detail-message" role="status"></p>
       </section>`);
+  }
+  if (isTicketOwner(ticket, user) && ticket.status === 'COMPLETED' && ticket.assignedTechnicianId
+      && String(ticket.assignedTechnicianId) !== String(user.id)) {
+    panels.push(`
+      <section class="action-panel" aria-labelledby="ticket-review-title">
+        <h3 id="ticket-review-title">Rate your repair</h3>
+        <p>Your rating is for ${escapeHtml(ticket.assignedTechnicianName ?? 'the completing technician')}.</p>
+        <a class="text-link" href="./reviews.html?technicianId=${encodeURIComponent(ticket.assignedTechnicianId)}">See this technician's public reviews</a>
+        <form id="ticket-review-form" class="action-form">
+          <label for="ticket-review-score">Rating</label>
+          <select id="ticket-review-score" required>
+            <option value="">Select 1–5 stars</option>
+            ${[1, 2, 3, 4, 5].map((star) => `<option value="${star}">${star} star${star === 1 ? '' : 's'}</option>`).join('')}
+          </select>
+          <label for="ticket-review-comment">Comment <span>(optional, up to 1000 characters)</span></label>
+          <textarea id="ticket-review-comment" rows="4" maxlength="1000" placeholder="Share your experience"></textarea>
+          <button id="ticket-review-save" type="submit">Save rating</button>
+        </form>
+        <p id="ticket-review-message" class="detail-message" role="status" aria-live="polite">Loading your rating...</p>
+      </section>`);
+  } else if (isTicketOwner(ticket, user) && ticket.status === 'COMPLETED'
+      && String(ticket.assignedTechnicianId) === String(user.id)) {
+    panels.push('<section class="action-panel"><h3>Rating unavailable</h3><p>You cannot rate a repair you completed yourself.</p></section>');
   }
   if (!panels.length) {
     panels.push('<div class="empty-state"><p>No action is needed from you right now.</p></div>');
@@ -1204,6 +1336,70 @@ function bindDetailInteractions(ticket) {
     completeButton
   ));
   document.getElementById('detail-cancel-request')?.addEventListener('click', () => confirmCancelTicket(ticket.id));
+  const reviewForm = document.getElementById('ticket-review-form');
+  reviewForm?.addEventListener('submit', (event) => saveTicketReview(event, ticket.id));
+  if (reviewForm) loadTicketReview(ticket.id).catch((error) =>
+    setText(document.getElementById('ticket-review-message'), error.message));
+
+  document.querySelectorAll('.technician-candidate-select').forEach((button) => {
+    button.addEventListener('click', () => {
+      const select = document.getElementById(button.dataset.select);
+      if (select) select.value = button.dataset.technicianId;
+      document.querySelectorAll(`.technician-candidate-select[data-select="${button.dataset.select}"]`)
+        .forEach((candidate) => candidate.classList.toggle('is-selected', candidate === button));
+    });
+  });
+}
+
+async function loadTicketReview(ticketId) {
+  const message = document.getElementById('ticket-review-message');
+  const form = document.getElementById('ticket-review-form');
+  if (!form) return;
+  const [reviewResponse, ban] = await Promise.all([
+    apiRequest(`/reviews/tickets/${ticketId}/mine`),
+    fetchJson('/reviews/me/ban', 'Loading review access failed')
+  ]);
+  if (reviewResponse.status !== 404 && !reviewResponse.ok) {
+    throw new Error(await readApiError(reviewResponse, 'Loading your rating failed'));
+  }
+  const review = reviewResponse.ok ? await reviewResponse.json() : null;
+  const score = document.getElementById('ticket-review-score');
+  const comment = document.getElementById('ticket-review-comment');
+  if (score) score.value = review?.visibility === 'REMOVED' ? '' : String(review?.score ?? '');
+  if (comment) comment.value = review?.visibility === 'ACTIVE' ? review?.comment ?? '' : '';
+  form.querySelectorAll('select, textarea, button').forEach((input) => { input.disabled = Boolean(ban.banned); });
+  setText(message, ban.banned
+    ? `Your rating access is suspended${ban.expiresAt ? ` until ${formatDate(ban.expiresAt)}` : ''}. ${ban.reason ?? ''}`
+    : review?.visibility === 'REMOVED' ? 'The previous rating was removed. You can submit a new one.'
+      : review ? 'You can edit your rating at any time.' : 'Your rating will be public after you save it.');
+}
+
+async function saveTicketReview(event, ticketId) {
+  event.preventDefault();
+  const score = Number(document.getElementById('ticket-review-score')?.value);
+  const comment = document.getElementById('ticket-review-comment')?.value.trim() ?? '';
+  const message = document.getElementById('ticket-review-message');
+  const button = document.getElementById('ticket-review-save');
+  if (!Number.isInteger(score) || score < 1 || score > 5) {
+    setText(message, 'Choose a rating from 1 to 5 stars.');
+    return;
+  }
+  if (comment.length > 1000) {
+    setText(message, 'Comments must be 1000 characters or fewer.');
+    return;
+  }
+  if (button) button.disabled = true;
+  setText(message, 'Saving rating...');
+  try {
+    await fetchJson(`/reviews/tickets/${ticketId}/mine`, 'Saving rating failed', {
+      method: 'PUT', body: JSON.stringify({ score, comment })
+    });
+    setText(message, 'Your rating is saved and can be edited at any time.');
+  } catch (error) {
+    setText(message, error.message);
+  } finally {
+    if (button) button.disabled = false;
+  }
 }
 
 function openImageLightbox(source, alt, trigger) {
@@ -2022,6 +2218,486 @@ async function updateAdminUserAccess(userId, identityType, roles) {
   }
 }
 
+function reviewStars(score) {
+  const number = Number(score);
+  return Number.isInteger(number) && number >= 1 && number <= 5
+    ? `${number} / 5 ★` : 'Rating unavailable';
+}
+
+function reviewBanDescription(ban) {
+  if (!ban?.banned) return 'Rating access is active.';
+  return `Rating access is suspended${ban.expiresAt ? ` until ${formatDate(ban.expiresAt)}` : ' permanently'}.`
+    + (ban.reason ? ` Reason: ${ban.reason}` : '');
+}
+
+async function initReviewsPage() {
+  const user = await requireCurrentUser();
+  if (!user) return;
+  if (!hasRole(user, 'GENERAL_USER')) {
+    window.location.href = getLandingPage();
+    return;
+  }
+  const main = document.getElementById('main-content');
+  if (main) main.hidden = false;
+  await loadReviewDirectory();
+}
+
+async function loadReviewDirectory() {
+  const message = document.getElementById('reviews-message');
+  const container = document.getElementById('technician-review-directory');
+  if (!container) return;
+  setText(message, 'Loading reviews...');
+  try {
+    const requestedId = new URLSearchParams(window.location.search).get('technicianId');
+    const path = requestedId && /^\d+$/.test(requestedId)
+      ? `/reviews/technicians/${requestedId}` : '/reviews/technicians';
+    const [directory, ban] = await Promise.all([
+      fetchJson(path, 'Loading technician reviews failed'),
+      fetchJson('/reviews/me/ban', 'Loading rating access failed')
+    ]);
+    const technicians = Array.isArray(directory) ? directory : [directory];
+    renderReviewDirectory(technicians.filter(Boolean), container, Boolean(requestedId));
+    setText(message, ban?.banned ? reviewBanDescription(ban) : '');
+    message?.classList.remove('error-state');
+  } catch (error) {
+    container.innerHTML = '';
+    setText(message, error.message);
+    message?.classList.add('error-state');
+  }
+}
+
+function renderReviewDirectory(technicians, container, filtered = false) {
+  if (!technicians.length) {
+    container.innerHTML = '<div class="empty-state"><p>No technician reviews are available yet.</p></div>';
+    return;
+  }
+  container.innerHTML = `${filtered ? '<p><a class="text-link" href="./reviews.html">View all technicians</a></p>' : ''}`
+    + technicians.map((technician) => {
+      const count = Math.max(0, Number(technician.ratingCount) || 0);
+      const reviews = Array.isArray(technician.reviews) ? technician.reviews : [];
+      return `<section class="surface technician-review-card" aria-labelledby="technician-review-${technician.id}">
+        <header class="surface-header"><div class="surface-heading"><h2 id="technician-review-${technician.id}">${escapeHtml(technician.name)}</h2>
+          <p>${count ? `${formatRating(technician.averageRating)} / 5 · ${count} rating${count === 1 ? '' : 's'}` : 'No ratings yet'}</p></div></header>
+        <div class="review-list">${reviews.length ? reviews.map((review) => `
+          <article class="review-entry">
+            <div class="review-entry-heading"><strong>${reviewStars(review.score)}</strong><time>${formatDate(review.createdAt)}</time></div>
+            ${review.comment ? `<p class="review-comment">${escapeHtml(review.comment)}</p>` : '<p class="muted-copy">No public comment.</p>'}
+            <details class="review-report"><summary>Report this review</summary>
+              <form class="review-report-form" data-review-id="${review.id}">
+                <label for="report-reason-${review.id}">Why are you reporting this review?</label>
+                <textarea id="report-reason-${review.id}" name="reason" rows="3" maxlength="1000" required></textarea>
+                <button type="submit" class="secondary-button">Submit report</button>
+                <p class="app-status-message" role="status" aria-live="polite"></p>
+              </form>
+            </details>
+          </article>`).join('') : '<p class="muted-copy">No published ratings yet.</p>'}</div>
+      </section>`;
+    }).join('');
+  container.querySelectorAll('.review-report-form').forEach((form) => {
+    form.addEventListener('submit', submitReviewReport);
+  });
+}
+
+async function submitReviewReport(event) {
+  event.preventDefault();
+  const form = event.currentTarget;
+  const reason = form.querySelector('[name="reason"]')?.value.trim() ?? '';
+  const message = form.querySelector('[role="status"]');
+  if (!reason) {
+    setText(message, 'Please explain your report.');
+    return;
+  }
+  const button = form.querySelector('button[type="submit"]');
+  if (button) button.disabled = true;
+  try {
+    await fetchJson(`/reviews/${encodeURIComponent(form.dataset.reviewId)}/reports`, 'Submitting report failed', {
+      method: 'POST', body: JSON.stringify({ reason })
+    });
+    setText(message, 'Report received. You will receive a notification after review.');
+    if (button) button.disabled = true;
+    loadUnreadCount().catch(() => {});
+  } catch (error) {
+    setText(message, error.message);
+    if (button) button.disabled = false;
+  }
+}
+
+async function loadUnreadCount() {
+  const badge = document.getElementById('notifications-unread-count');
+  if (!badge) return;
+  const version = ++notificationCountVersion;
+  const requestedUserId = currentWorkspaceUser?.id;
+  const requestedRole = getActiveRole(currentWorkspaceUser);
+  const data = await fetchJson('/notifications', 'Loading notifications failed');
+  if (version !== notificationCountVersion || String(currentWorkspaceUser?.id) !== String(requestedUserId)
+      || getActiveRole(currentWorkspaceUser) !== requestedRole) return;
+  const unread = Math.max(0, Number(data?.unreadCount) || 0);
+  badge.hidden = unread === 0;
+  badge.textContent = unread ? String(unread) : '';
+  badge.setAttribute('aria-label', `${unread} unread notifications`);
+}
+
+async function initNotificationsPage() {
+  const user = await requireCurrentUser();
+  if (!user) return;
+  const main = document.getElementById('main-content');
+  if (main) main.hidden = false;
+  await loadNotifications();
+}
+
+async function loadNotifications() {
+  const message = document.getElementById('notifications-message');
+  const container = document.getElementById('notifications-list');
+  if (!container) return;
+  setText(message, 'Loading notifications...');
+  try {
+    const data = await fetchJson('/notifications', 'Loading notifications failed');
+    renderNotifications(data?.notifications ?? [], container);
+    setText(message, data?.unreadCount ? `${data.unreadCount} unread` : 'All caught up.');
+    message?.classList.remove('error-state');
+    const badge = document.getElementById('notifications-unread-count');
+    if (badge) {
+      notificationCountVersion += 1;
+      badge.hidden = !data?.unreadCount;
+      badge.textContent = data?.unreadCount ? String(data.unreadCount) : '';
+    }
+  } catch (error) {
+    container.innerHTML = '';
+    setText(message, error.message);
+    message?.classList.add('error-state');
+  }
+}
+
+function renderNotifications(notifications, container) {
+  if (!notifications.length) {
+    container.innerHTML = '<div class="empty-state"><p>No notifications yet.</p></div>';
+    return;
+  }
+  container.innerHTML = notifications.map((item) => `
+    <article class="surface notification-entry${item.readAt ? '' : ' is-unread'}" data-notification-id="${item.id}">
+      <div><div class="review-entry-heading"><strong>${escapeHtml(formatNotificationType(item.type))}</strong>
+        <time>${formatDate(item.createdAt)}</time></div>
+        <p>${escapeHtml(item.message)}</p>
+        ${item.ticketId ? `<a class="text-link" href="./request-detail.html?id=${encodeURIComponent(item.ticketId)}">Open request</a>` : ''}</div>
+      ${item.readAt ? '' : '<button type="button" class="secondary-button notification-read">Mark read</button>'}
+    </article>`).join('');
+  container.querySelectorAll('.notification-read').forEach((button) => {
+    button.addEventListener('click', () => markNotificationRead(button));
+  });
+}
+
+function formatNotificationType(type) {
+  const labels = {
+    STATUS_CHANGED: 'Request status updated', COMMENT_ADDED: 'New request comment',
+    TICKET_ASSIGNED: 'Request assigned', TICKET_REASSIGNED: 'Request reassigned',
+    RESOLUTION_CONFIRMED: 'Resolution confirmed', TICKET_REOPENED: 'Request reopened',
+    TICKET_COMPLETED: 'Request completed', REVIEW_REPORT_SUBMITTED: 'Report received',
+    REVIEW_REPORT_RESOLVED: 'Report reviewed', REVIEW_REPORT_RECEIVED: 'Review reported',
+    REVIEW_TEXT_REMOVED: 'Comment removed', REVIEW_REMOVED: 'Rating removed',
+    REVIEW_RESTORED: 'Rating restored', REVIEW_BANNED: 'Rating access suspended',
+    REVIEW_UNBANNED: 'Rating access restored'
+  };
+  return labels[type] ?? String(type ?? 'Update').replaceAll('_', ' ').toLowerCase();
+}
+
+async function markNotificationRead(button) {
+  const entry = button.closest('[data-notification-id]');
+  if (!entry) return;
+  button.disabled = true;
+  try {
+    await fetchJson(`/notifications/${encodeURIComponent(entry.dataset.notificationId)}/read`,
+      'Marking notification read failed', { method: 'PUT' });
+    entry.classList.remove('is-unread');
+    button.remove();
+    await loadNotifications();
+  } catch (error) {
+    button.disabled = false;
+    const message = document.getElementById('notifications-message');
+    setText(message, error.message);
+  }
+}
+
+async function initReviewAdminPage() {
+  const user = await requireCurrentUser();
+  if (!user) return;
+  if (!hasRole(user, 'ADMINISTRATOR')) {
+    window.location.href = getLandingPage();
+    return;
+  }
+  const main = document.getElementById('main-content');
+  if (main) main.hidden = false;
+  const banForm = document.getElementById('rating-ban-form');
+  banForm?.addEventListener('submit', banStudentRating);
+  document.getElementById('rating-unban')?.addEventListener('click', unbanStudentRating);
+  document.getElementById('rating-ban-student')?.addEventListener('change', loadSelectedStudentBan);
+  await loadReviewModeration();
+}
+
+async function loadReviewModeration() {
+  const message = document.getElementById('review-admin-message');
+  setText(message, 'Loading reviews...');
+  try {
+    const [reviews, reports, users] = await Promise.all([
+      fetchJson('/admin/reviews', 'Loading reviews failed'),
+      fetchJson('/admin/reviews/reports', 'Loading reports failed'),
+      fetchJson('/admin/users', 'Loading students failed')
+    ]);
+    renderAdminReviews(reviews ?? []);
+    renderReviewReports(reports ?? [], reviews ?? []);
+    populateRatingStudents(users ?? []);
+    setText(message, '');
+    message?.classList.remove('error-state');
+  } catch (error) {
+    setText(message, error.message);
+    message?.classList.add('error-state');
+  }
+}
+
+function renderAdminReviews(reviews) {
+  const container = document.getElementById('admin-reviews-list');
+  if (!container) return;
+  const requestedId = new URLSearchParams(window.location.search).get('technicianId');
+  const shown = requestedId && /^\d+$/.test(requestedId)
+    ? reviews.filter((review) => String(review.technicianId) === requestedId) : reviews;
+  container.innerHTML = `${requestedId ? '<p><a class="text-link" href="./review-admin.html">View all reviews</a></p>' : ''}`
+    + (shown.length ? shown.map((review) => {
+      const selfAuthored = String(review.authorId) === String(currentWorkspaceUser?.id);
+      return `<article class="review-entry admin-review-entry" data-review-id="${review.id}">
+        <div class="review-entry-heading"><strong>${reviewStars(review.score)}</strong>
+          <span class="review-visibility">${escapeHtml(review.visibility)}</span><time>${formatDate(review.createdAt)}</time></div>
+        <p><strong>${escapeHtml(review.technicianName)}</strong> · Request #${escapeHtml(review.ticketId)}</p>
+        <p class="muted-copy">By ${escapeHtml(review.authorName)} (${escapeHtml(review.authorEmail)})</p>
+        ${review.comment ? `<p class="review-comment">${escapeHtml(review.comment)}</p>` : '<p class="muted-copy">No written comment.</p>'}
+        <details class="review-audit" data-review-id="${review.id}"><summary>View change and moderation history</summary>
+          <div class="review-audit-list" role="status">Open to load history.</div></details>
+        ${selfAuthored ? '<p class="muted-copy">Another administrator must moderate a review you wrote.</p>' : `
+          <form class="review-moderation-form" data-review-id="${review.id}">
+            <label for="review-action-${review.id}">Action</label>
+            <select id="review-action-${review.id}" name="action" required>
+              <option value="">Select action</option>
+              ${review.visibility === 'ACTIVE' && review.comment ? '<option value="REMOVE_TEXT">Remove comment, retain rating</option>' : ''}
+              ${review.visibility !== 'REMOVED' ? '<option value="REMOVE_ALL">Remove rating and comment</option>' : ''}
+              ${review.visibility !== 'ACTIVE' ? '<option value="RESTORE">Restore removed content</option>' : ''}
+            </select>
+            <label for="review-reason-${review.id}">Reason</label>
+            <textarea id="review-reason-${review.id}" name="reason" rows="2" maxlength="1000" required></textarea>
+            <button type="submit" class="secondary-button">Apply action</button>
+            <p class="app-status-message" role="status" aria-live="polite"></p>
+          </form>`}
+      </article>`;
+    }).join('') : '<p class="muted-copy">No reviews match this view.</p>');
+  container.querySelectorAll('.review-moderation-form').forEach((form) => {
+    form.addEventListener('submit', submitReviewModeration);
+  });
+  container.querySelectorAll('.review-audit').forEach((details) => {
+    details.addEventListener('toggle', () => {
+      if (details.open && details.dataset.loaded !== 'true') loadReviewAudit(details);
+    });
+  });
+}
+
+async function loadReviewAudit(details) {
+  const target = details.querySelector('.review-audit-list');
+  if (!target) return;
+  setText(target, 'Loading history...');
+  try {
+    const history = await fetchJson(`/admin/reviews/${encodeURIComponent(details.dataset.reviewId)}/audit`,
+      'Loading review history failed');
+    target.innerHTML = history.length ? `<ol class="review-audit-items">${history.map((item) => `
+      <li><strong>${escapeHtml(item.action)}</strong> by ${escapeHtml(item.actorName)} · ${formatDate(item.occurredAt)}
+        ${item.reason ? `<p>Reason: ${escapeHtml(item.reason)}</p>` : ''}
+        ${(item.beforeScore != null || item.afterScore != null) ? `<p>Score: ${escapeHtml(item.beforeScore ?? 'none')} → ${escapeHtml(item.afterScore ?? 'none')}</p>` : ''}
+        ${(item.beforeComment || item.afterComment) ? `<p>Comment: ${escapeHtml(item.beforeComment ?? 'none')} → ${escapeHtml(item.afterComment ?? 'none')}</p>` : ''}
+      </li>`).join('')}</ol>` : '<p>No changes recorded.</p>';
+    details.dataset.loaded = 'true';
+  } catch (error) {
+    setText(target, error.message);
+  }
+}
+
+async function submitReviewModeration(event) {
+  event.preventDefault();
+  const form = event.currentTarget;
+  const action = form.querySelector('[name="action"]')?.value;
+  const reason = form.querySelector('[name="reason"]')?.value.trim() ?? '';
+  const message = form.querySelector('[role="status"]');
+  if (!action || !reason) {
+    setText(message, 'Select an action and enter a reason.');
+    return;
+  }
+  const button = form.querySelector('button[type="submit"]');
+  if (button) button.disabled = true;
+  try {
+    await fetchJson(`/admin/reviews/${encodeURIComponent(form.dataset.reviewId)}/moderation`,
+      'Moderation failed', { method: 'POST', body: JSON.stringify({ action, reason }) });
+    await loadReviewModeration();
+    setText(document.getElementById('review-admin-message'), 'Review action saved. The author was notified.');
+  } catch (error) {
+    setText(message, error.message);
+    if (button) button.disabled = false;
+  }
+}
+
+function renderReviewReports(reports, reviews) {
+  const container = document.getElementById('review-reports-list');
+  if (!container) return;
+  const pending = reports.filter((report) => report.status === 'PENDING');
+  container.innerHTML = pending.length ? pending.map((report) => {
+    const review = reviews.find((item) => String(item.id) === String(report.reviewId));
+    const selfInvolved = String(report.reporterId) === String(currentWorkspaceUser?.id)
+      || String(report.authorId) === String(currentWorkspaceUser?.id);
+    return `<article class="review-entry report-entry" data-report-id="${report.id}">
+      <div class="review-entry-heading"><strong>Report #${escapeHtml(report.id)}</strong><time>${formatDate(report.createdAt)}</time></div>
+      <p>Reported by ${escapeHtml(report.reporterName)} · ${review ? `Review of ${escapeHtml(review.technicianName)}` : `Review #${escapeHtml(report.reviewId)}`}</p>
+      <p class="review-comment"><strong>Report reason:</strong> ${escapeHtml(report.reason)}</p>
+      <div class="review-report-snapshot">
+        <strong>Content when reported</strong>
+        <p>Rating: ${reviewStars(report.reportedScore)}</p>
+        <p class="review-comment">${report.reportedComment
+          ? escapeHtml(report.reportedComment) : 'No written comment at the time of the report.'}</p>
+      </div>
+      ${review ? `<div class="review-report-current">
+        <strong>Current review · ${escapeHtml(review.visibility)}</strong>
+        <p>Rating: ${reviewStars(review.score)}</p>
+        <p class="review-comment">${review.comment ? escapeHtml(review.comment) : 'No current written comment.'}</p>
+      </div>` : ''}
+      ${selfInvolved ? '<p class="muted-copy">Another administrator must handle a report involving you.</p>' : `
+        <form class="report-resolution-form" data-report-id="${report.id}">
+          <label for="report-action-${report.id}">Action</label>
+          <select id="report-action-${report.id}" name="action" required>
+            <option value="">Select action</option>
+            <option value="DISMISS">Dismiss report</option>
+            ${review?.visibility === 'ACTIVE' && review.comment ? '<option value="REMOVE_TEXT">Remove comment, retain rating</option>' : ''}
+            ${review?.visibility !== 'REMOVED' ? '<option value="REMOVE_ALL">Remove rating and comment</option>' : ''}
+            <option value="BAN_AUTHOR">Remove comment and suspend author's rating access</option>
+          </select>
+          <label for="report-resolution-reason-${report.id}">Reason</label>
+          <textarea id="report-resolution-reason-${report.id}" name="reason" rows="2" maxlength="1000" required></textarea>
+          <label for="report-expiry-${report.id}">Suspension end date <span>(optional; blank means permanent)</span></label>
+          <input id="report-expiry-${report.id}" name="expiresAt" type="datetime-local">
+          <button type="submit" class="secondary-button">Resolve report</button>
+          <p class="app-status-message" role="status" aria-live="polite"></p>
+        </form>`}
+    </article>`;
+  }).join('') : '<p class="muted-copy">No reports need action.</p>';
+  container.querySelectorAll('.report-resolution-form').forEach((form) => {
+    form.addEventListener('submit', submitReportResolution);
+  });
+}
+
+async function submitReportResolution(event) {
+  event.preventDefault();
+  const form = event.currentTarget;
+  const action = form.querySelector('[name="action"]')?.value;
+  const reason = form.querySelector('[name="reason"]')?.value.trim() ?? '';
+  const message = form.querySelector('[role="status"]');
+  if (!action || !reason) {
+    setText(message, 'Select an action and enter a reason.');
+    return;
+  }
+  const button = form.querySelector('button[type="submit"]');
+  if (button) button.disabled = true;
+  const expiresAt = form.querySelector('[name="expiresAt"]')?.value || null;
+  try {
+    await fetchJson(`/admin/reviews/reports/${encodeURIComponent(form.dataset.reportId)}/resolve`,
+      'Resolving report failed', {
+        method: 'POST', body: JSON.stringify({ action, reason, ...(action === 'BAN_AUTHOR' && expiresAt ? { expiresAt } : {}) })
+      });
+    await loadReviewModeration();
+    setText(document.getElementById('review-admin-message'), 'Report resolved. The reporter was notified.');
+  } catch (error) {
+    setText(message, error.message);
+    if (button) button.disabled = false;
+  }
+}
+
+function populateRatingStudents(users) {
+  const select = document.getElementById('rating-ban-student');
+  if (!select) return;
+  const selected = select.value;
+  const eligible = users.filter((user) => rolesFor(user).includes('GENERAL_USER'));
+  select.innerHTML = '<option value="">Select a student</option>' + eligible.map((user) =>
+    `<option value="${user.id}">${escapeHtml(user.name)} (${escapeHtml(user.email)})</option>`).join('');
+  if (eligible.some((user) => String(user.id) === selected)) select.value = selected;
+  if (select.value) loadSelectedStudentBan();
+}
+
+async function loadSelectedStudentBan() {
+  const studentId = document.getElementById('rating-ban-student')?.value;
+  const state = document.getElementById('rating-ban-state');
+  const unbanButton = document.getElementById('rating-unban');
+  if (!studentId) {
+    setText(state, 'Select a student to see rating access.');
+    if (unbanButton) unbanButton.disabled = true;
+    return;
+  }
+  try {
+    const ban = await fetchJson(`/admin/reviews/students/${encodeURIComponent(studentId)}/ban`,
+      'Loading rating access failed');
+    if (document.getElementById('rating-ban-student')?.value !== studentId) return;
+    setText(state, reviewBanDescription(ban));
+    if (unbanButton) unbanButton.disabled = !ban.banned || String(studentId) === String(currentWorkspaceUser?.id);
+  } catch (error) {
+    setText(state, error.message);
+    if (unbanButton) unbanButton.disabled = true;
+  }
+}
+
+async function banStudentRating(event) {
+  event.preventDefault();
+  const studentId = document.getElementById('rating-ban-student')?.value;
+  const reason = document.getElementById('rating-ban-reason')?.value.trim() ?? '';
+  const expiresAt = document.getElementById('rating-ban-expiry')?.value || null;
+  const message = document.getElementById('rating-ban-message');
+  if (!studentId || !reason) {
+    setText(message, 'Select a student and enter a reason.');
+    return;
+  }
+  if (String(studentId) === String(currentWorkspaceUser?.id)) {
+    setText(message, 'Another administrator must manage your rating access.');
+    return;
+  }
+  const button = document.getElementById('rating-ban-save');
+  if (button) button.disabled = true;
+  try {
+    await fetchJson(`/admin/reviews/students/${encodeURIComponent(studentId)}/ban`,
+      'Suspending rating access failed', {
+        method: 'POST', body: JSON.stringify({ reason, ...(expiresAt ? { expiresAt } : {}) })
+      });
+    await loadSelectedStudentBan();
+    setText(message, 'Rating access suspended. The student was notified.');
+  } catch (error) {
+    setText(message, error.message);
+  } finally {
+    if (button) button.disabled = false;
+  }
+}
+
+async function unbanStudentRating() {
+  const studentId = document.getElementById('rating-ban-student')?.value;
+  const reason = document.getElementById('rating-ban-reason')?.value.trim() ?? '';
+  const message = document.getElementById('rating-ban-message');
+  if (!studentId || !reason) {
+    setText(message, 'Select a student and enter a reason.');
+    return;
+  }
+  if (String(studentId) === String(currentWorkspaceUser?.id)) {
+    setText(message, 'Another administrator must manage your rating access.');
+    return;
+  }
+  const button = document.getElementById('rating-unban');
+  if (button) button.disabled = true;
+  try {
+    await fetchJson(`/admin/reviews/students/${encodeURIComponent(studentId)}/unban`,
+      'Restoring rating access failed', { method: 'POST', body: JSON.stringify({ reason }) });
+    await loadSelectedStudentBan();
+    setText(message, 'Rating access restored. The student was notified.');
+  } catch (error) {
+    setText(message, error.message);
+    if (button) button.disabled = false;
+  }
+}
+
 // Compatibility helpers for the previous single-page workspace.
 async function initWorkspace() {
   if (pageName === 'dashboard' || elementByAnyId('dashboard-metrics', 'dashboard-stats')) {
@@ -2164,6 +2840,9 @@ else if (['request-detail', 'detail'].includes(pageName)) initRequestDetailPage(
 else if (['request-form', 'form'].includes(pageName)) initRequestFormPage();
 else if (pageName === 'profile' && profileForm) initProfilePage();
 else if (pageName === 'admin' && (adminPage || adminUsersBody)) initAdminPage();
+else if (pageName === 'reviews') initReviewsPage();
+else if (pageName === 'review-admin') initReviewAdminPage();
+else if (pageName === 'notifications') initNotificationsPage();
 else {
   if (workspacePage) initWorkspace();
   if (profileForm) initProfilePage();

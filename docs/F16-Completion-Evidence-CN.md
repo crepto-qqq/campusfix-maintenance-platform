@@ -31,3 +31,5 @@
 `ASSIGNED -> IN_PROGRESS -> Upload Completion Evidence -> COMPLETED`
 
 当前实现没有强制“必须先上传 evidence 才能 Completed”，以保持现有 F14 status workflow 向后兼容。
+
+工单进入 `COMPLETED` 后，其提交者可在学生模式下评价最终完成工单的维修人员；完成证据本身不改变评价资格。详见 [维修人员评分、评价与审核](Technician-Ratings-Reviews-CN.md)。
