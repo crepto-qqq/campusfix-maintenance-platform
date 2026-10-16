@@ -48,6 +48,16 @@ public class Ticket {
     @Column(nullable = false, length = 255)
     private String location;
 
+    @Column(name = "google_place_id", length = 255)
+    private String googlePlaceId;
+
+    private Double latitude;
+
+    private Double longitude;
+
+    @Column(name = "location_details", length = 500)
+    private String locationDetails;
+
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 30)
     private UrgencyLevel urgency;
@@ -132,6 +142,38 @@ public class Ticket {
 
     public void setLocation(String location) {
         this.location = location;
+    }
+
+    public String getGooglePlaceId() {
+        return googlePlaceId;
+    }
+
+    public void setGooglePlaceId(String googlePlaceId) {
+        this.googlePlaceId = googlePlaceId;
+    }
+
+    public Double getLatitude() {
+        return latitude;
+    }
+
+    public void setLatitude(Double latitude) {
+        this.latitude = latitude;
+    }
+
+    public Double getLongitude() {
+        return longitude;
+    }
+
+    public void setLongitude(Double longitude) {
+        this.longitude = longitude;
+    }
+
+    public String getLocationDetails() {
+        return locationDetails;
+    }
+
+    public void setLocationDetails(String locationDetails) {
+        this.locationDetails = locationDetails;
     }
 
     public UrgencyLevel getUrgency() {

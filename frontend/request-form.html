@@ -133,7 +133,23 @@
 
                   <div class="form-field form-field-full">
                     <label for="ticket-location">Location</label>
-                    <input id="ticket-location" name="location" type="text" maxlength="255" autocomplete="street-address" placeholder="Building, level and room or nearby landmark" required>
+                    <div id="place-autocomplete-container" class="place-autocomplete-container" hidden></div>
+                    <input id="ticket-location" name="location" type="text" maxlength="255" autocomplete="street-address" placeholder="Search for a place or enter an address" required>
+                    <small id="location-search-help">You can enter a location manually. Google place search will appear here when it is configured.</small>
+                    <input id="ticket-google-place-id" name="googlePlaceId" type="hidden">
+                    <input id="ticket-latitude" name="latitude" type="hidden">
+                    <input id="ticket-longitude" name="longitude" type="hidden">
+                  </div>
+
+                  <div id="ticket-map-panel" class="form-field form-field-full map-picker" hidden>
+                    <div id="ticket-map" class="ticket-map" role="application" aria-label="Choose the maintenance location on the map"></div>
+                    <small>Click the map or drag the marker to adjust the exact location.</small>
+                  </div>
+
+                  <div class="form-field form-field-full">
+                    <label for="ticket-location-details">Building details <span class="optional-label">Optional</span></label>
+                    <input id="ticket-location-details" name="locationDetails" type="text" maxlength="500" autocomplete="off" placeholder="For example, Level 2, Room 204, next to the lift">
+                    <small>Add a level, room number, entrance or nearby landmark that Google Maps may not know.</small>
                   </div>
                 </div>
               </div>
@@ -180,6 +196,6 @@
       </div>
     </div>
 
-    <script src="./js/app.js?v=20261014-reviews"></script>
+    <script src="./js/app.js?v=20261016-maps-reviews"></script>
   </body>
 </html>

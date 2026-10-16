@@ -53,6 +53,7 @@ public class TicketService {
 
     @Transactional
     public Ticket createTicket(TicketRequest request, User submittedBy) {
+        validateCoordinates(request);
         Ticket ticket = new Ticket(
                 normalize(request.title()),
                 normalize(request.description()),
@@ -60,6 +61,7 @@ public class TicketService {
                 normalize(request.location()),
                 request.urgency(),
                 submittedBy);
+        applyLocationData(ticket, request);
         Ticket saved = ticketRepository.save(ticket);
         recordHistory(
                 saved,
@@ -408,6 +410,7 @@ public class TicketService {
 
     @Transactional
     public Ticket updateTicket(Long ticketId, Long userId, TicketRequest request) {
+        validateCoordinates(request);
         Ticket ticket = getTicketOwnedByUser(ticketId, userId);
 
         if (isWorkStarted(ticket)) {
@@ -428,6 +431,7 @@ public class TicketService {
         ticket.setDescription(normalize(request.description()));
         ticket.setCategory(request.category());
         ticket.setLocation(normalize(request.location()));
+        applyLocationData(ticket, request);
         ticket.setUrgency(request.urgency());
         ticket.touch();
         Ticket saved = ticketRepository.save(ticket);
@@ -669,6 +673,8 @@ public class TicketService {
                 + " | description=" + ticket.getDescription()
                 + " | category=" + ticket.getCategory()
                 + " | location=" + ticket.getLocation()
+                + " | coordinates=" + ticket.getLatitude() + "," + ticket.getLongitude()
+                + " | locationDetails=" + ticket.getLocationDetails()
                 + " | urgency=" + ticket.getUrgency()
                 + " | operationalPriority=" + ticket.getOperationalPriority();
     }
@@ -680,5 +686,20 @@ public class TicketService {
     private String normalizeBlankToNull(String value) {
         String normalized = normalize(value);
         return normalized == null || normalized.isBlank() ? null : normalized;
+    }
+
+    private void applyLocationData(Ticket ticket, TicketRequest request) {
+        ticket.setGooglePlaceId(normalizeBlankToNull(request.googlePlaceId()));
+        ticket.setLatitude(request.latitude());
+        ticket.setLongitude(request.longitude());
+        ticket.setLocationDetails(normalizeBlankToNull(request.locationDetails()));
+    }
+
+    private void validateCoordinates(TicketRequest request) {
+        if ((request.latitude() == null) != (request.longitude() == null)) {
+            throw new ResponseStatusException(
+                    HttpStatus.BAD_REQUEST,
+                    "Latitude and longitude must be provided together");
+        }
     }
 }
