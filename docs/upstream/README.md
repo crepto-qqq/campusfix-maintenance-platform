@@ -109,6 +109,7 @@ CAMPUSFIX_ADMIN_PASSWORD=your-strong-local-admin-password
 CAMPUSFIX_BREVO_API_KEY=xkeysib-your-shared-private-key
 CAMPUSFIX_EMAIL_FROM_NAME=CampusFix
 CAMPUSFIX_EMAIL_FROM_ADDRESS=your-verified-sender@example.com
+CAMPUSFIX_GOOGLE_MAPS_API_KEY=your-browser-restricted-google-maps-key
 CAMPUSFIX_EMAIL_VERIFICATION_REQUIRED=true
 ```
 
@@ -200,6 +201,27 @@ python3 -m http.server 5500 --directory frontend
 Open `http://localhost:5500/index.html`. Every team member starts both commands
 on their own computer. Separate browsers or private windows can be used to
 demonstrate different signed-in users on the same computer.
+
+### Enable Google Maps location selection
+
+The request form continues to support manual locations when Google Maps is not
+configured. To enable place search and map pin selection:
+
+1. Create or select a Google Cloud project and attach a billing account.
+2. Enable **Maps JavaScript API** and **Places API (New)**.
+3. Create a browser API key and restrict it to these HTTP referrers for local
+   development:
+   `http://localhost:5500/*` and `http://127.0.0.1:5500/*`.
+4. Restrict the key to **Maps JavaScript API** and **Places API (New)**.
+5. Add the key to the ignored `backend/.env.local` file:
+
+```properties
+CAMPUSFIX_GOOGLE_MAPS_API_KEY=your-browser-restricted-google-maps-key
+```
+
+Restart the back-end after changing `.env.local`. Browser API keys are visible
+to site visitors by design, so referrer restrictions, API restrictions, usage
+quotas, and billing alerts must be configured in Google Cloud.
 
 ## Database Design
 

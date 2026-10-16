@@ -2574,6 +2574,35 @@ body.lightbox-open {
   grid-column: 1 / -1;
 }
 
+.place-autocomplete-container {
+  min-width: 0;
+}
+
+.place-autocomplete-container gmp-place-autocomplete {
+  width: 100%;
+}
+
+.map-picker {
+  gap: 8px;
+}
+
+.ticket-map {
+  width: 100%;
+  height: clamp(260px, 38vw, 420px);
+  overflow: hidden;
+  border: 1px solid var(--app-border-strong);
+  border-radius: var(--app-radius);
+  background: var(--app-surface-subtle);
+}
+
+.map-location-link {
+  display: inline-block;
+  margin-top: 6px;
+  color: var(--app-primary);
+  font-size: 0.78rem;
+  font-weight: 650;
+}
+
 .field-help,
 .form-help {
   margin: 0;

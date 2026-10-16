@@ -151,6 +151,10 @@ async function revalidateFocusedAccount() {
 
 window.addEventListener?.('storage', handleAccountChange);
 window.addEventListener?.('focus', revalidateFocusedAccount);
+let ticketLocationMap = null;
+let ticketLocationMarker = null;
+let ticketPlaceAutocomplete = null;
+let suppressLocationInputReset = false;
 
 function rolesFor(user) {
   const roles = Array.isArray(user?.roles) ? user.roles : (user?.role ? [user.role] : []);
@@ -1055,6 +1059,13 @@ function renderCompletionEvidence(ticket, evidence) {
 }
 
 function renderTicketMetadata(ticket) {
+  const hasCoordinates = Number.isFinite(ticket.latitude) && Number.isFinite(ticket.longitude);
+  const locationDetails = ticket.locationDetails
+    ? `<small>${escapeHtml(ticket.locationDetails)}</small>`
+    : '';
+  const mapsLink = hasCoordinates
+    ? `<a class="map-location-link" href="https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(`${ticket.latitude},${ticket.longitude}`)}" target="_blank" rel="noopener noreferrer">Open in Google Maps</a>`
+    : '';
   return `
     <dl class="detail-meta-list">
       <div><dt>Status</dt><dd>${renderStatusBadge(ticket.status)}</dd></div>
@@ -1063,7 +1074,7 @@ function renderTicketMetadata(ticket) {
     ? `<span class="priority-badge priority-${ticket.operationalPriority.toLowerCase()}">${formatPriority(ticket.operationalPriority)}</span>`
     : '<span class="priority-badge priority-unclassified">Unclassified</span>'}</dd></div>
       <div><dt>Category</dt><dd>${escapeHtml(formatCategory(ticket.category))}</dd></div>
-      <div><dt>Location</dt><dd>${escapeHtml(ticket.location)}</dd></div>
+      <div><dt>Location</dt><dd>${escapeHtml(ticket.location)}${locationDetails}${mapsLink}</dd></div>
       <div><dt>Assigned technician</dt><dd>${ticket.assignedTechnicianId
     ? `${escapeHtml(ticket.assignedTechnicianName)}<small>${escapeHtml(ticket.assignedTechnicianEmail)}</small>`
     : 'Unassigned'}</dd></div>
@@ -1838,11 +1849,168 @@ async function deleteExistingTicketImage(ticketId, imageId) {
   }
 }
 
+function loadGoogleMapsApi(apiKey) {
+  if (window.google?.maps?.Map && window.google?.maps?.places) return Promise.resolve();
+  return new Promise((resolve, reject) => {
+    const existingScript = document.querySelector('script[data-campusfix-google-maps]');
+    if (existingScript) {
+      if (window.google?.maps?.Map) resolve();
+      else existingScript.addEventListener('load', resolve, { once: true });
+      existingScript.addEventListener('error', () => reject(new Error('Google Maps could not be loaded.')), { once: true });
+      return;
+    }
+    const callbackName = '__campusfixGoogleMapsReady';
+    const script = document.createElement('script');
+    script.dataset.campusfixGoogleMaps = 'true';
+    script.src = `https://maps.googleapis.com/maps/api/js?key=${encodeURIComponent(apiKey)}&loading=async&libraries=places&v=weekly&callback=${callbackName}`;
+    script.async = true;
+    window[callbackName] = () => {
+      delete window[callbackName];
+      resolve();
+    };
+    script.onerror = () => {
+      delete window[callbackName];
+      reject(new Error('Google Maps could not be loaded.'));
+    };
+    document.head.appendChild(script);
+  });
+}
+
+function setLocationPickerMessage(message) {
+  setText(document.getElementById('location-search-help'), message);
+}
+
+function clearGoogleLocationSelection() {
+  const placeIdInput = document.getElementById('ticket-google-place-id');
+  const latitudeInput = document.getElementById('ticket-latitude');
+  const longitudeInput = document.getElementById('ticket-longitude');
+  if (placeIdInput) placeIdInput.value = '';
+  if (latitudeInput) latitudeInput.value = '';
+  if (longitudeInput) longitudeInput.value = '';
+  ticketLocationMarker?.setMap(null);
+}
+
+function updateMapSelection(position, centreMap = false) {
+  if (!ticketLocationMap || !ticketLocationMarker || !position) return;
+  const latitude = typeof position.lat === 'function' ? position.lat() : position.lat;
+  const longitude = typeof position.lng === 'function' ? position.lng() : position.lng;
+  if (!Number.isFinite(latitude) || !Number.isFinite(longitude)) return;
+  document.getElementById('ticket-latitude').value = String(latitude);
+  document.getElementById('ticket-longitude').value = String(longitude);
+  ticketLocationMarker.setPosition({ lat: latitude, lng: longitude });
+  ticketLocationMarker.setMap(ticketLocationMap);
+  if (centreMap) {
+    ticketLocationMap.setCenter({ lat: latitude, lng: longitude });
+    ticketLocationMap.setZoom(17);
+  }
+}
+
+async function initialiseGoogleLocationPicker() {
+  const container = document.getElementById('place-autocomplete-container');
+  const mapPanel = document.getElementById('ticket-map-panel');
+  const mapElement = document.getElementById('ticket-map');
+  if (!container || !mapPanel || !mapElement) return;
+
+  try {
+    const configuration = await fetchJson('/config/maps', 'Loading map configuration failed');
+    if (!configuration.enabled || !configuration.apiKey) {
+      setLocationPickerMessage('Enter the location manually. Google Maps is not configured for this environment.');
+      return;
+    }
+
+    await loadGoogleMapsApi(configuration.apiKey);
+    let MapConstructor = google.maps.Map;
+    let PlaceAutocompleteConstructor = google.maps.places?.PlaceAutocompleteElement;
+    if (typeof google.maps.importLibrary === 'function') {
+      const [mapsLibrary, placesLibrary] = await Promise.all([
+        google.maps.importLibrary('maps'),
+        google.maps.importLibrary('places')
+      ]);
+      MapConstructor = mapsLibrary.Map;
+      PlaceAutocompleteConstructor = placesLibrary.PlaceAutocompleteElement;
+    }
+    if (!MapConstructor || !PlaceAutocompleteConstructor) {
+      throw new Error('The required Google Maps libraries are unavailable.');
+    }
+
+    mapPanel.hidden = false;
+    ticketLocationMap = new MapConstructor(mapElement, {
+      center: { lat: 20, lng: 0 },
+      zoom: 2,
+      streetViewControl: false,
+      mapTypeControl: false,
+      fullscreenControl: true
+    });
+    ticketLocationMarker = new google.maps.Marker({
+      draggable: true,
+      title: 'Selected maintenance location'
+    });
+
+    ticketLocationMap.addListener('click', ({ latLng }) => {
+      document.getElementById('ticket-google-place-id').value = '';
+      updateMapSelection(latLng);
+      setLocationPickerMessage('Exact map position selected. Confirm the address and add any building details below.');
+    });
+    ticketLocationMarker.addListener('dragend', ({ latLng }) => {
+      document.getElementById('ticket-google-place-id').value = '';
+      updateMapSelection(latLng);
+      setLocationPickerMessage('Marker position updated. Confirm the address and add any building details below.');
+    });
+
+    ticketPlaceAutocomplete = new PlaceAutocompleteConstructor();
+    ticketPlaceAutocomplete.placeholder = 'Search Google Maps';
+    ticketPlaceAutocomplete.addEventListener('gmp-select', async ({ placePrediction }) => {
+      try {
+        const place = placePrediction.toPlace();
+        await place.fetchFields({
+          fields: ['id', 'formattedAddress', 'location', 'viewport']
+        });
+        if (!place.location) throw new Error('The selected place does not have map coordinates.');
+
+        const locationInput = document.getElementById('ticket-location');
+        const selectedLatitude = place.location.lat();
+        const selectedLongitude = place.location.lng();
+        suppressLocationInputReset = true;
+        locationInput.value = place.formattedAddress
+          || `Pinned location (${selectedLatitude.toFixed(6)}, ${selectedLongitude.toFixed(6)})`;
+        suppressLocationInputReset = false;
+        document.getElementById('ticket-google-place-id').value = place.id ?? '';
+        updateMapSelection(place.location);
+        if (place.viewport) ticketLocationMap.fitBounds(place.viewport);
+        else {
+          ticketLocationMap.setCenter(place.location);
+          ticketLocationMap.setZoom(17);
+        }
+        setLocationPickerMessage('Google location selected. Drag the marker if the maintenance issue is at a more precise position.');
+      } catch (error) {
+        suppressLocationInputReset = false;
+        setLocationPickerMessage(error.message || 'The selected place could not be loaded. Enter the location manually.');
+      }
+    });
+    container.replaceChildren(ticketPlaceAutocomplete);
+    container.hidden = false;
+    document.getElementById('ticket-location').placeholder = 'Selected address or manual location';
+    setLocationPickerMessage('Search Google Maps, or enter a location manually below.');
+  } catch (error) {
+    container.hidden = true;
+    mapPanel.hidden = true;
+    setLocationPickerMessage(`${error.message} Enter the location manually.`);
+  }
+}
+
 function populateTicketForm(ticket) {
   document.getElementById('ticket-title').value = ticket.title;
   document.getElementById('ticket-description').value = ticket.description;
   document.getElementById('ticket-category').value = ticket.category;
   document.getElementById('ticket-location').value = ticket.location;
+  document.getElementById('ticket-google-place-id').value = ticket.googlePlaceId ?? '';
+  document.getElementById('ticket-latitude').value = ticket.latitude ?? '';
+  document.getElementById('ticket-longitude').value = ticket.longitude ?? '';
+  document.getElementById('ticket-location-details').value = ticket.locationDetails ?? '';
+  if (ticketPlaceAutocomplete) ticketPlaceAutocomplete.value = ticket.location;
+  if (Number.isFinite(ticket.latitude) && Number.isFinite(ticket.longitude)) {
+    updateMapSelection({ lat: ticket.latitude, lng: ticket.longitude }, true);
+  }
   document.getElementById('ticket-urgency').value = ticket.urgency;
   if (ticketIdInput) ticketIdInput.value = ticket.id;
   document.title = 'Edit Request | CampusFix';
@@ -1888,11 +2056,17 @@ async function uploadTicketImages(ticketId, files) {
 async function handleTicketSubmit(event) {
   event.preventDefault();
   const editingId = ticketIdInput?.value || '';
+  const latitudeValue = document.getElementById('ticket-latitude').value;
+  const longitudeValue = document.getElementById('ticket-longitude').value;
   const ticketData = {
     title: document.getElementById('ticket-title').value.trim(),
     description: document.getElementById('ticket-description').value.trim(),
     category: document.getElementById('ticket-category').value,
     location: document.getElementById('ticket-location').value.trim(),
+    googlePlaceId: document.getElementById('ticket-google-place-id').value || null,
+    latitude: latitudeValue === '' ? null : Number(latitudeValue),
+    longitude: longitudeValue === '' ? null : Number(longitudeValue),
+    locationDetails: document.getElementById('ticket-location-details').value.trim() || null,
     urgency: document.getElementById('ticket-urgency').value
   };
   if (existingTicketImages.length + selectedTicketFiles.length > 5) {
@@ -1945,6 +2119,10 @@ async function initRequestFormPage() {
   });
   ticketForm?.addEventListener('submit', handleTicketSubmit);
   ticketResetButton?.addEventListener('click', resetTicketForm);
+  document.getElementById('ticket-location')?.addEventListener('input', () => {
+    if (!suppressLocationInputReset) clearGoogleLocationSelection();
+  });
+  await initialiseGoogleLocationPicker();
   const ticketId = getTicketIdFromUrl();
   if (ticketId) await loadTicketForForm(ticketId);
 }
