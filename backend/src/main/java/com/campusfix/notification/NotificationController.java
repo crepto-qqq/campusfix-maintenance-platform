@@ -92,17 +92,25 @@ public class NotificationController {
         NotificationType type = notification.getType();
         return switch (activeRole) {
             case GENERAL_USER -> switch (type) {
-                case STATUS_CHANGED, COMMENT_ADDED, TICKET_COMPLETED,
+                case STATUS_CHANGED, TICKET_COMPLETED,
                         RESOLUTION_CONFIRMED, TICKET_REOPENED,
                         REVIEW_TEXT_REMOVED, REVIEW_REMOVED, REVIEW_RESTORED,
                         REVIEW_REPORT_SUBMITTED, REVIEW_REPORT_RESOLVED,
                         REVIEW_BANNED, REVIEW_UNBANNED -> true;
-                case TICKET_REASSIGNED -> notification.getTicket() != null
+                case TICKET_ASSIGNED -> notification.getDeduplicationKey().startsWith("TICKET_ASSIGNED_REQUESTER:")
+                        && notification.getTicket() != null
+                        && notification.getTicket().getSubmittedBy().getId().equals(recipient.getId());
+                case COMMENT_ADDED, TICKET_REASSIGNED -> notification.getTicket() != null
                         && notification.getTicket().getSubmittedBy().getId().equals(recipient.getId());
                 default -> false;
             };
-            case MAINTENANCE_STAFF -> type == NotificationType.TICKET_ASSIGNED
-                    || type == NotificationType.TICKET_REASSIGNED;
+            case MAINTENANCE_STAFF -> type == NotificationType.TICKET_REASSIGNED
+                    || (type == NotificationType.TICKET_ASSIGNED
+                    && !notification.getDeduplicationKey().startsWith("TICKET_ASSIGNED_REQUESTER:"))
+                    || (type == NotificationType.COMMENT_ADDED
+                    && notification.getTicket() != null
+                    && notification.getTicket().getActiveAssignment() != null
+                    && notification.getTicket().getActiveAssignment().getTechnician().getId().equals(recipient.getId()));
             case ADMINISTRATOR -> type == NotificationType.REVIEW_REPORT_RECEIVED;
             case MANAGER -> false;
         };

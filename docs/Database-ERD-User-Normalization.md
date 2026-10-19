@@ -18,6 +18,8 @@ erDiagram
     APP_USERS ||--o{ TICKET_HISTORY : performs
     TICKETS ||--o{ TICKET_HISTORY : records
     TICKETS ||--o{ TICKET_IMAGES : contains
+    TICKETS ||--o{ TICKET_COMMENTS : contains
+    APP_USERS ||--o{ TICKET_COMMENTS : writes
     TICKETS ||--o{ TICKET_ASSIGNMENTS : has
     APP_USERS ||--o{ TICKET_ASSIGNMENTS : technician
     APP_USERS ||--o{ TICKET_ASSIGNMENTS : assigns
@@ -94,6 +96,15 @@ erDiagram
         bigint actor_id FK
         enum event_type
         timestamp occurred_at
+    }
+
+    TICKET_COMMENTS {
+        bigint id PK
+        bigint ticket_id FK
+        bigint author_id FK
+        enum author_role
+        varchar body
+        timestamp created_at
     }
 
     TICKET_ASSIGNMENTS {
@@ -182,6 +193,7 @@ erDiagram
 | `system_roles` | Authorisation role catalogue |
 | `user_role_assignments` | Current and historical role allocation, including administrator and time |
 | `ticket_assignments` | Current and historical Technician allocation, including assigning Administrator and time |
+| `ticket_comments` | Ticket conversation, author, role at posting and timestamp; separate from service reviews |
 | `in_app_notifications` | Durable, deduplicated business events and student notification centre; `ticket_id` may be absent for account-level review bans |
 | `technician_reviews` | One current review per completed ticket, linked to its author and final technician; visibility supports text-only or full removal |
 | `review_reports` | Student reports and their resolution, with a unique pending key per reporter and review |
@@ -199,6 +211,8 @@ erDiagram
 - `tickets.operational_priority`独立于Requester填写的`urgency`，允许`NULL`表示尚未由Administrator分级，并建立`idx_tickets_operational_priority`索引。
 - 初次分派使用独立`ticket_assignments`关系表；工单状态、Assignment、History和Notification在同一事务中保存。
 - 评分汇总仅包含未被完整撤下的评价；只撤下评论时评分仍然有效。公开视图不返回作者或工单的身份字段。
+- 留言与对方通知在同一事务保存。留言、改派和结束状态更新按工单加锁，避免旧维修人员在改派后继续发布或并发完成生成重复通知。
+- 分析指标使用聚合查询和首次完工历史时间，不依赖包含图片内容的完整工单列表。
 
 ## Legacy Migration
 

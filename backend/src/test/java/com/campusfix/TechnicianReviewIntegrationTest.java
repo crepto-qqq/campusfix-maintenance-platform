@@ -153,11 +153,13 @@ class TechnicianReviewIntegrationTest {
         assertTrue(indexOf(technicians, idleId) < indexOf(technicians, busyId));
         assertEquals(403, send(requester, "GET", "/api/tickets/technicians", "", null).statusCode());
 
-        // An account with two roles receives its assignment notification in maintenance mode only.
+        // A self-assigned account receives distinct requester and technician notices in their own workspaces.
         String studentNotifications = send(dual, "GET", "/api/notifications", "", "GENERAL_USER").body();
         String staffNotifications = send(dual, "GET", "/api/notifications", "", "MAINTENANCE_STAFF").body();
-        assertFalse(studentNotifications.contains("TICKET_ASSIGNED"));
-        assertTrue(staffNotifications.contains("TICKET_ASSIGNED"));
+        assertTrue(studentNotifications.contains("was assigned to Dual Role"));
+        assertFalse(studentNotifications.contains("You were assigned"));
+        assertTrue(staffNotifications.contains("You were assigned"));
+        assertFalse(staffNotifications.contains("was assigned to Dual Role"));
     }
 
     @Test

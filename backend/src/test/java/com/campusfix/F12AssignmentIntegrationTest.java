@@ -169,7 +169,7 @@ class F12AssignmentIntegrationTest {
                 assignmentPath,
                 "{\"technicianId\":" + otherTechnicianId + "}").statusCode());
         assertEquals(1, assignmentRepository.countByTicket_Id(mainTicketId));
-        assertEquals(1, notificationRepository.countByTicket_IdAndType(
+        assertEquals(2, notificationRepository.countByTicket_IdAndType(
                 mainTicketId,
                 NotificationType.TICKET_ASSIGNED));
         String finalHistory = get(adminClient, "/api/tickets/" + mainTicketId + "/history").body();

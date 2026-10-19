@@ -70,4 +70,13 @@ public interface TicketRepository extends JpaRepository<Ticket, Long> {
     long countByOperationalPriority(TicketPriority operationalPriority);
 
     long countByOperationalPriorityIsNull();
+
+    @Query("select t.status, count(t) from Ticket t group by t.status order by t.status")
+    List<Object[]> countsByStatus();
+
+    @Query("select t.category, count(t) from Ticket t group by t.category order by count(t) desc, t.category")
+    List<Object[]> countsByCategory();
+
+    @Query("select t.location, count(t) from Ticket t group by t.location order by count(t) desc, t.location")
+    List<Object[]> countsByLocation();
 }

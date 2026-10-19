@@ -20,4 +20,8 @@ public interface TicketAssignmentRepository extends JpaRepository<TicketAssignme
             + "and assignment.ticket.status in :statuses")
     long countOpenForTechnician(@Param("technicianId") Long technicianId,
             @Param("statuses") List<TicketStatus> statuses);
+
+    @Query("select a.technician.id, count(a) from TicketAssignment a "
+            + "where a.active = true and a.ticket.status in :statuses group by a.technician.id")
+    List<Object[]> openWorkloads(@Param("statuses") List<TicketStatus> statuses);
 }

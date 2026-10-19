@@ -729,6 +729,7 @@ function renderRequestRows(tickets, container, messageElement, user = currentWor
 }
 
 async function loadDashboardData(user = currentWorkspaceUser) {
+  const analyticsLoad = loadMaintenanceAnalytics(user);
   const version = ++dashboardLoadVersion;
   const message = elementByAnyId('dashboard-message');
   const list = elementByAnyId('dashboard-tickets', 'dashboard-focus-list', 'attention-requests-list');
@@ -756,7 +757,77 @@ async function loadDashboardData(user = currentWorkspaceUser) {
     }
     setText(message, error.message);
     message?.classList.add('error-state');
+  } finally {
+    await analyticsLoad;
   }
+}
+
+let analyticsLoadVersion = 0;
+
+async function loadMaintenanceAnalytics(user = currentWorkspaceUser) {
+  const version = ++analyticsLoadVersion;
+  const section = document.getElementById('maintenance-analytics');
+  const content = document.getElementById('analytics-content');
+  const message = document.getElementById('analytics-message');
+  if (!section || !content) return;
+  const isAdmin = hasRole(user, 'ADMINISTRATOR');
+  section.hidden = !isAdmin;
+  content.innerHTML = '';
+  setText(message, '');
+  if (!isAdmin) return;
+  content.setAttribute('aria-busy', 'true');
+  setText(message, 'Loading statistics...');
+  const stillCurrent = () => version === analyticsLoadVersion
+    && String(currentWorkspaceUser?.id) === String(user?.id)
+    && hasRole(currentWorkspaceUser, 'ADMINISTRATOR');
+  try {
+    const data = await fetchJson('/tickets/analytics', 'Loading statistics failed');
+    if (!stillCurrent()) return;
+    renderMaintenanceAnalytics(data, content);
+    setText(message, '');
+    message?.classList.remove('error-state');
+  } catch (error) {
+    if (!stillCurrent()) return;
+    content.innerHTML = '';
+    setText(message, error.message);
+    message?.classList.add('error-state');
+  } finally {
+    if (version === analyticsLoadVersion) content.setAttribute('aria-busy', 'false');
+  }
+}
+
+function renderMaintenanceAnalytics(data, content) {
+  const cards = [
+    ['Total requests', data.totalRequests, 'All requests, including cancelled'],
+    ['Awaiting assignment', data.pendingRequests, 'Submitted requests'],
+    ['Completed repairs', data.completedRequests, 'Completed and closed requests'],
+    ['Completion rate', `${Number(data.completionRate).toFixed(1)}%`, 'Completed / all non-cancelled requests'],
+    ['Average completion time', data.averageCompletionHours == null ? 'No data yet'
+      : data.averageCompletionHours > 0 && data.averageCompletionHours < 0.1 ? '<0.1 h'
+        : `${Number(data.averageCompletionHours).toFixed(1)} h`,
+      `${data.completionTimeSamples} repair${data.completionTimeSamples === 1 ? '' : 's'} with a recorded completion time`],
+    ['Average service rating', data.averageRating == null ? 'No ratings yet'
+      : `${Number(data.averageRating).toFixed(1)} / 5`, `${data.ratingCount} published rating${data.ratingCount === 1 ? '' : 's'}`]
+  ];
+  const breakdown = (title, rows, formatter) => `<section class="surface analytics-breakdown"><h3>${title}</h3>
+    ${rows.length ? `<ul class="analytics-distribution">${rows.map((row) => `<li>
+      <div><span>${escapeHtml(formatter(row.label))}</span><strong>${Number(row.count)}</strong></div>
+      <meter min="0" max="${Math.max(1, data.totalRequests)}" value="${Number(row.count)}"
+        aria-label="${escapeHtml(formatter(row.label))}: ${Number(row.count)} requests"></meter></li>`).join('')}</ul>`
+      : '<p class="muted-copy">No requests yet.</p>'}</section>`;
+  content.innerHTML = `<div class="stat-grid analytics-stats">${cards.map(([label, value, note]) =>
+    `<div class="stat-card"><span class="stat-label">${label}</span><strong class="stat-value">${escapeHtml(String(value))}</strong>
+      <span class="stat-note">${escapeHtml(note)}</span></div>`).join('')}</div>
+    <div class="analytics-breakdowns">
+      ${breakdown('Requests by status', data.requestsByStatus, formatStatus)}
+      ${breakdown('Requests by category', data.requestsByCategory, formatCategory)}
+      ${breakdown('Requests by location', data.requestsByLocation, (label) => label)}
+      <section class="surface analytics-breakdown"><h3>Technician workload</h3>
+        <p class="muted-copy">Current unfinished assignments for active technicians.</p>
+        ${data.staffWorkload.length ? `<ul class="analytics-workload">${data.staffWorkload.map((staff) =>
+          `<li><span>${escapeHtml(staff.name)}</span><strong>${Number(staff.openAssignments)} open</strong></li>`).join('')}</ul>`
+          : '<p class="muted-copy">No active technicians.</p>'}</section>
+    </div>`;
 }
 
 function setupDashboardRoleSwitcher(user) {
@@ -812,6 +883,7 @@ async function initDashboard() {
   const user = await requireCurrentUser();
   if (!user) return;
   setupDashboardRoleSwitcher(user);
+  document.getElementById('analytics-refresh')?.addEventListener('click', () => loadMaintenanceAnalytics());
   await loadDashboardData(user);
   await loadTechnicianAverage(user);
 }
@@ -1266,6 +1338,7 @@ function renderRequestDetail(ticket, evidence, user) {
           ${renderTicketGallery(ticket)}
         </section>
         ${renderCompletionEvidence(ticket, evidence)}
+        ${renderTicketConversation(ticket, user)}
         <section class="detail-section activity-section" aria-labelledby="activity-heading">
           <div class="detail-heading">
             <h2 id="activity-heading">Activity</h2>
@@ -1285,7 +1358,101 @@ function renderRequestDetail(ticket, evidence, user) {
   bindDetailInteractions(ticket);
 }
 
+function canCommentOnTicket(ticket, user) {
+  return !isTerminalStatus(ticket.status) && (
+    (hasRole(user, 'GENERAL_USER') && ticket.submittedById === user.id)
+    || isAssignedTechnician(ticket, user));
+}
+
+function renderTicketConversation(ticket, user) {
+  const canComment = canCommentOnTicket(ticket, user);
+  return `<section class="detail-section ticket-conversation" aria-labelledby="ticket-comments-title">
+    <div class="detail-heading"><h2 id="ticket-comments-title">Conversation</h2>
+      <button id="ticket-comments-refresh" class="secondary-button" type="button">Refresh messages</button></div>
+    <p class="muted-copy">Messages are shared with the requester, the assigned technician and administrators.</p>
+    <p id="ticket-comments-message" class="app-status-message" role="status" aria-live="polite"></p>
+    <ol id="ticket-comments-list" class="ticket-comments-list" aria-live="polite"></ol>
+    ${canComment ? `<form id="ticket-comment-form" class="ticket-comment-form">
+      <label for="ticket-comment-body">Add a message</label>
+      <textarea id="ticket-comment-body" name="body" rows="3" maxlength="2000" required
+        aria-describedby="ticket-comment-help" placeholder="Share access details, ask a question or post a repair update"></textarea>
+      <p id="ticket-comment-help" class="muted-copy">Up to 2,000 characters. Use the repair actions to change the request status.</p>
+      <button id="ticket-comment-submit" class="primary-button" type="submit">Send message</button>
+      <p id="ticket-comment-status" class="app-status-message" role="status" aria-live="polite"></p>
+    </form>` : `<p class="muted-copy">${isTerminalStatus(ticket.status)
+      ? 'This request has ended. The conversation is read-only.' : 'Administrators can read this conversation.'}</p>`}
+  </section>`;
+}
+
+let commentLoadVersion = 0;
+
+async function loadTicketComments(ticketId) {
+  const list = document.getElementById('ticket-comments-list');
+  const message = document.getElementById('ticket-comments-message');
+  if (!list) return;
+  const version = ++commentLoadVersion;
+  const requestedUser = currentWorkspaceUser;
+  const role = getActiveRole(requestedUser);
+  const stillCurrent = () => version === commentLoadVersion
+    && document.getElementById('ticket-comments-list') === list
+    && String(currentWorkspaceUser?.id) === String(requestedUser?.id)
+    && getActiveRole(currentWorkspaceUser) === role;
+  list.setAttribute('aria-busy', 'true');
+  setText(message, 'Loading messages...');
+  try {
+    const comments = await fetchJson(`/tickets/${ticketId}/comments`, 'Loading messages failed');
+    if (!stillCurrent()) return;
+    renderTicketComments(comments, list);
+    setText(message, '');
+  } catch (error) {
+    if (!stillCurrent()) return;
+    list.innerHTML = '';
+    setText(message, error.message);
+  } finally {
+    if (stillCurrent()) list.setAttribute('aria-busy', 'false');
+  }
+}
+
+function renderTicketComments(comments, list) {
+  list.innerHTML = comments.length ? comments.map((comment) => `<li class="ticket-comment">
+    <div class="review-entry-heading"><strong>${escapeHtml(comment.authorName)}</strong>
+      <span class="muted-copy">${escapeHtml(formatRole(comment.authorRole))}</span><time>${formatDate(comment.createdAt)}</time></div>
+    <p class="ticket-comment-body">${escapeHtml(comment.body)}</p></li>`).join('')
+    : '<li class="muted-copy">No messages yet.</li>';
+}
+
+async function submitTicketComment(event, ticketId) {
+  event.preventDefault();
+  const input = document.getElementById('ticket-comment-body');
+  const button = document.getElementById('ticket-comment-submit');
+  const message = document.getElementById('ticket-comment-status');
+  if (!input || !button || button.disabled) return;
+  const body = input.value.trim();
+  if (!body || body.length > 2000) {
+    setText(message, 'Enter a message between 1 and 2,000 characters.');
+    return;
+  }
+  button.disabled = true;
+  setText(message, 'Sending message...');
+  try {
+    await fetchJson(`/tickets/${ticketId}/comments`, 'Sending message failed', {
+      method: 'POST', body: JSON.stringify({ body })
+    });
+    if (document.getElementById('ticket-comment-body') !== input) return;
+    if (input.value.trim() === body) input.value = '';
+    setText(message, 'Message sent.');
+    await loadTicketComments(ticketId);
+  } catch (error) {
+    setText(message, error.message);
+  } finally {
+    button.disabled = false;
+  }
+}
+
 function bindDetailInteractions(ticket) {
+  document.getElementById('ticket-comment-form')?.addEventListener('submit', (event) => submitTicketComment(event, ticket.id));
+  document.getElementById('ticket-comments-refresh')?.addEventListener('click', () => loadTicketComments(ticket.id));
+  if (document.getElementById('ticket-comments-list')) loadTicketComments(ticket.id);
   const gallery = document.querySelector('.ticket-gallery');
   const mainImage = gallery?.querySelector('.gallery-main-image');
   const mainButton = gallery?.querySelector('.gallery-main-button');

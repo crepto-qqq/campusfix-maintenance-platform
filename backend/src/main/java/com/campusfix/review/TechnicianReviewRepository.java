@@ -12,6 +12,9 @@ import org.springframework.data.repository.query.Param;
 import jakarta.persistence.LockModeType;
 
 public interface TechnicianReviewRepository extends JpaRepository<TechnicianReview, Long> {
+    @Query("select avg(r.score), count(r) from TechnicianReview r where r.visibility <> :removed")
+    List<Object[]> ratingStatistics(@Param("removed") ReviewVisibility removed);
+
     @EntityGraph(attributePaths = {"ticket", "technician", "technician.profile", "author", "author.profile"})
     Optional<TechnicianReview> findByTicket_Id(Long ticketId);
 

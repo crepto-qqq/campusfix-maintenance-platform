@@ -2858,6 +2858,27 @@ body.lightbox-open {
 .review-entry-heading { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; }
 .review-entry-heading time { margin-left: auto; color: var(--app-muted); font-size: 0.8rem; }
 .review-comment { white-space: pre-wrap; overflow-wrap: anywhere; }
+.ticket-comments-list { list-style: none; margin: 16px 0; padding: 0; display: grid; gap: 16px; }
+.ticket-comment { padding: 16px 0; border-bottom: 1px solid var(--app-border); }
+.ticket-comment-body { white-space: pre-wrap; overflow-wrap: anywhere; margin: 10px 0 0; }
+.ticket-comment-form { display: grid; gap: 10px; margin-top: 18px; }
+.ticket-comment-form textarea { width: 100%; min-height: 100px; resize: vertical; }
+.ticket-comment-form button { justify-self: start; }
+.ticket-comment-form .muted-copy { margin: 0; }
+.ticket-conversation .detail-heading { flex-wrap: wrap; gap: 12px; }
+.maintenance-analytics { margin-bottom: 28px; }
+.maintenance-analytics .section-heading { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px; margin: 24px 0 16px; }
+.maintenance-analytics .analytics-stats { grid-template-columns: repeat(auto-fit, minmax(min(260px, 100%), 1fr)); margin-bottom: 20px; }
+.analytics-stats .stat-value { font-size: clamp(1.3rem, 3vw, 2rem); }
+.analytics-breakdowns { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(300px, 100%), 1fr)); gap: 20px; }
+.analytics-breakdown { min-width: 0; }
+.analytics-breakdown h3 { margin: 0 0 16px; }
+.analytics-distribution, .analytics-workload { list-style: none; margin: 0; padding: 0; display: grid; gap: 14px; max-height: 360px; overflow-y: auto; }
+.analytics-distribution li > div, .analytics-workload li { display: flex; justify-content: space-between; gap: 16px; }
+.analytics-distribution span, .analytics-workload span { overflow-wrap: anywhere; min-width: 0; }
+.analytics-workload strong { white-space: nowrap; }
+.analytics-distribution meter { width: 100%; height: 12px; accent-color: var(--app-primary); }
+.analytics-distribution meter::-webkit-meter-optimum-value { background: var(--app-primary); }
 .review-report-snapshot, .review-report-current { margin: 10px 0; padding: 10px 12px; border-radius: 9px; background: var(--app-surface-subtle); }
 .review-report-snapshot { border-left: 3px solid var(--app-primary); }
 .review-report-current { border-left: 3px solid var(--app-border-strong); }

@@ -52,7 +52,7 @@ The main goals of CampusFix are to:
 - Collect feedback to improve maintenance service quality
 - Develop a reliable full-stack web application
 
-## Proposed Technology Stack
+## Technology Stack
 
 | Component | Technology |
 |---|---|
@@ -63,7 +63,7 @@ The main goals of CampusFix are to:
 | Version Control | Git and GitHub |
 | Project Management | JIRA |
 
-The final technology choices may be adjusted after team discussion and tutor feedback.
+The application uses the stack above for local development and demonstration.
 
 ## Project Scope
 
@@ -76,7 +76,10 @@ The initial version of CampusFix will focus on the core maintenance workflow:
 - Complete a maintenance request
 - Provide a rating and feedback
 
-Additional features such as image uploads, notifications and data visualisations may be considered in later sprints if time permits.
+Image uploads, role-specific notifications, ticket conversations, Google Maps
+location selection, service reviews and moderation, and administrator analytics
+are implemented. See the [requirements and closeout acceptance guide](docs/Requirements-Closeout-CN.md)
+for the canonical FR01–FR20 mapping, workflow rules, and demonstration steps.
 
 ## Local Development
 
@@ -236,6 +239,25 @@ directory. The configuration intentionally has no relative-path fallback, so a
 stale launch cannot silently create another database. Existing legacy user data
 is migrated automatically on first startup.
 
+## Verification
+
+Run the back-end suite with Java 21:
+
+```bash
+cd backend
+./gradlew test
+```
+
+From the repository root, run the front-end tests with Node.js:
+
+```bash
+node --test frontend/tests/*.test.cjs
+```
+
+Back-end integration tests use isolated in-memory databases. Browser acceptance
+steps, analytics definitions and outstanding non-functional validation are
+documented in the [closeout guide](docs/Requirements-Closeout-CN.md).
+
 ## Team Members and Responsibilities
 
 | Team Member | Primary Role | Responsibilities |
@@ -247,9 +269,9 @@ is migrated automatically on first startup.
 
 All team members will contribute to project planning, development, testing and documentation.
 
-## Sprint 0 Activities
+## Sprint 0 Planning Reference
 
-During Sprint 0, the team will:
+The original Sprint 0 planning scope was:
 
 - Confirm the project topic and scope
 - Set up the GitHub organisation and repository
