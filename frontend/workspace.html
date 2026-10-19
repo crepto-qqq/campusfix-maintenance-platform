@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Dashboard | CampusFix</title>
     <link rel="stylesheet" href="./css/styles.css">
-    <link rel="stylesheet" href="./css/theme.css?v=20261014-reviews">
+    <link rel="stylesheet" href="./css/theme.css?v=20261019-closeout">
   </head>
   <body class="app-page" data-page="dashboard">
     <a class="skip-link" href="#main-content">Skip to main content</a>
@@ -105,6 +105,15 @@
               </div>
             </section>
 
+            <section id="maintenance-analytics" class="maintenance-analytics" data-requires-role="ADMINISTRATOR" aria-labelledby="maintenance-analytics-title" hidden>
+              <div class="section-heading">
+                <div><p class="section-eyebrow">Service performance</p><h2 id="maintenance-analytics-title">Maintenance analytics</h2></div>
+                <button id="analytics-refresh" class="secondary-button" type="button">Refresh statistics</button>
+              </div>
+              <p id="analytics-message" class="app-status-message" role="status" aria-live="polite"></p>
+              <div id="analytics-content" aria-live="polite"></div>
+            </section>
+
             <section id="technician-rating-section" class="surface technician-rating-section" aria-labelledby="technician-rating-title" hidden>
               <header class="surface-header">
                 <div class="surface-heading">
@@ -145,6 +154,6 @@
       </div>
     </div>
 
-    <script src="./js/app.js?v=20261014-reviews"></script>
+    <script src="./js/app.js?v=20261019-closeout"></script>
   </body>
 </html>

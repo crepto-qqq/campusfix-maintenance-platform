@@ -12,7 +12,7 @@ F15为工单增加不可由普通用户直接修改的审计历史。当前以�
 - `PRIORITY_CHANGED`
 - `TICKET_ASSIGNED`
 
-Priority事件已由F11正式使用，Assignment事件已由F12正式使用；同时预留Reassignment、Status Change、Resolution和Reopen事件类型，供F13–F14及F18直接使用。
+Priority、Assignment、Reassignment、Status Change 和 Completion Evidence 事件均已用于对应操作；Resolution 和 Reopen 类型保留作历史兼容。工单留言另存于 `ticket_comments`，不与状态审计或完工评价混用。
 
 ## 历史数据
 

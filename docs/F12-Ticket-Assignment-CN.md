@@ -46,7 +46,7 @@ Content-Type: application/json
 
 ### `in_app_notifications`
 
-成功分派生成`TICKET_ASSIGNED`事件，包括Recipient、Actor、Ticket、Message、Created At、Read At和唯一Deduplication Key。F12只负责产生事件，通知中心和已读操作属于F17。
+成功分派分别为报修人和维修人员生成`TICKET_ASSIGNED`通知，包括Recipient、Actor、Ticket、Message、Created At、Read At和唯一Deduplication Key。两种通知按活动角色隔离；兼任两种角色的同一账号也各有一条对应通知。通知中心和已读操作均已实现。这里的 F12/F17 是早期开发任务编号；需求 FR12 为通知、FR17 为派单，详见[需求对照](Requirements-Closeout-CN.md)。
 
 ### `ticket_history`
 
@@ -76,7 +76,7 @@ Content-Type: application/json
 | Technician有效性 | 不存在、禁用和非Technician均返回`400` |
 | 仅Administrator可分派 | Guest `401`；Requester、Technician `403` |
 | 已分派工单必须使用F13 | 第二次初始分派返回`409`，无重复副作用 |
-| 生成F17通知事件 | `in_app_notifications`存在唯一未读`TICKET_ASSIGNED`记录 |
+| 生成派单通知 | 报修人与维修人员分别收到未读`TICKET_ASSIGNED`记录，重复派单不生成额外通知 |
 | 角色数据可见性 | Assigned Technician只看到自己的已分派工单；其他Technician为`403` |
 
 完整Gradle测试套件、旧数据库副本升级、真实前端角色流程和重启持久化验证均通过。

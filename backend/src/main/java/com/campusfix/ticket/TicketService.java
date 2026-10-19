@@ -248,6 +248,11 @@ public class TicketService {
                 "You were assigned maintenance request #" + saved.getId()
                         + ": " + saved.getTitle(),
                 "TICKET_ASSIGNED:" + saved.getId() + ":" + assignment.getId()));
+        notificationRepository.save(new InAppNotification(
+                saved.getSubmittedBy(), administrator, saved, NotificationType.TICKET_ASSIGNED,
+                "Your maintenance request #" + saved.getId() + " was assigned to " + technician.getName()
+                        + ": " + saved.getTitle(),
+                "TICKET_ASSIGNED_REQUESTER:" + saved.getId() + ":" + assignment.getId()));
         return saved;
     }
 
@@ -319,7 +324,7 @@ public class TicketService {
                     "Only assigned maintenance staff can update request status");
         }
 
-        Ticket ticket = findTicket(ticketId);
+        Ticket ticket = findTicketForUpdate(ticketId);
         TicketAssignment assignment = ticket.getActiveAssignment();
         if (assignment == null || !assignment.getTechnician().getId().equals(technician.getId())) {
             throw new ResponseStatusException(
@@ -539,7 +544,8 @@ public class TicketService {
     }
 
     private Ticket getTicketOwnedByUser(Long ticketId, Long userId) {
-        Ticket ticket = findTicket(ticketId);
+        // Owner edits/cancellation serialize with assignment and conversation writes.
+        Ticket ticket = findTicketForUpdate(ticketId);
 
         if (!ticket.getSubmittedBy().getId().equals(userId)) {
             throw new ResponseStatusException(
