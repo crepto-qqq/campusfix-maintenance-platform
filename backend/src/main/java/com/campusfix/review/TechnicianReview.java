@@ -80,7 +80,10 @@ public class TechnicianReview {
     public void revise(int score, String comment) {
         this.score = score;
         this.comment = comment;
-        this.visibility = ReviewVisibility.ACTIVE;
+        // A removed review may be resubmitted, but edited text stays hidden until an administrator restores it.
+        if (this.visibility == ReviewVisibility.REMOVED) {
+            this.visibility = ReviewVisibility.ACTIVE;
+        }
         this.updatedAt = LocalDateTime.now();
     }
 

@@ -18,6 +18,11 @@ public interface TicketHistoryRepository extends JpaRepository<TicketHistory, Lo
     @Query("select h.ticket.createdAt, min(h.occurredAt) from TicketHistory h "
             + "where h.eventType = :event and h.newValue = :value and h.ticket.status in :statuses "
             + "group by h.ticket.id, h.ticket.createdAt")
-    List<Object[]> completionTimes(@Param("event") TicketEventType event,
+    List<Object[]> completionTimesByEventCode(@Param("event") String event,
             @Param("value") String value, @Param("statuses") List<TicketStatus> statuses);
+
+    default List<Object[]> completionTimes(TicketEventType event,
+            String value, List<TicketStatus> statuses) {
+        return completionTimesByEventCode(event.name(), value, statuses);
+    }
 }

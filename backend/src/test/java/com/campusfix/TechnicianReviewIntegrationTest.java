@@ -194,10 +194,20 @@ class TechnicianReviewIntegrationTest {
         assertEquals(1, technician(responseJson(send(admin, "GET", "/api/tickets/technicians", "", null)),
                 technicianId).path("ratingCount").asInt());
 
+        assertSuccess(send(student, "PUT", ownPath,
+                body(Map.of("score", 2, "comment", "Revised appropriate review")), "GENERAL_USER"));
+        JsonNode editedAfterTextRemoval = responseJson(send(student, "GET", ownPath,
+                "", "GENERAL_USER"));
+        assertEquals(2, editedAfterTextRemoval.path("score").asInt());
+        assertEquals("TEXT_REMOVED", editedAfterTextRemoval.path("visibility").asText());
+        String publicAfterEditedTextRemoval = send(student, "GET", "/api/reviews/technicians/" + technicianId,
+                "", "GENERAL_USER").body();
+        assertFalse(publicAfterEditedTextRemoval.contains("Revised appropriate review"));
+
         assertSuccess(send(admin, "POST", moderationPath,
                 body(Map.of("action", "RESTORE", "reason", "Mistaken removal")), null));
         assertTrue(send(student, "GET", "/api/reviews/technicians/" + technicianId,
-                "", "GENERAL_USER").body().contains("Remove this offensive phrase"));
+                "", "GENERAL_USER").body().contains("Revised appropriate review"));
         assertSuccess(send(admin, "POST", moderationPath,
                 body(Map.of("action", "REMOVE_ALL", "reason", "Fabricated rating")), null));
         assertTrue(send(student, "GET", "/api/notifications", "", "GENERAL_USER").body()
@@ -206,6 +216,10 @@ class TechnicianReviewIntegrationTest {
                 technicianId).path("ratingCount").asInt());
         assertSuccess(send(student, "PUT", ownPath,
                 body(Map.of("score", 4, "comment", "New appropriate review")), "GENERAL_USER"));
+        assertEquals("ACTIVE", responseJson(send(student, "GET", ownPath, "", "GENERAL_USER"))
+                .path("visibility").asText());
+        assertTrue(send(student, "GET", "/api/reviews/technicians/" + technicianId,
+                "", "GENERAL_USER").body().contains("New appropriate review"));
         String audit = send(admin, "GET", "/api/admin/reviews/" + reviewId + "/audit", "", null).body();
         assertTrue(audit.contains("REMOVE_TEXT"));
         assertTrue(audit.contains("RESTORE"));

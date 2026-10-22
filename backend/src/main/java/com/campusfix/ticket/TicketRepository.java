@@ -5,11 +5,8 @@ import java.util.Optional;
 
 import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
-import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
-
-import jakarta.persistence.LockModeType;
 
 public interface TicketRepository extends JpaRepository<Ticket, Long> {
 
@@ -24,17 +21,14 @@ public interface TicketRepository extends JpaRepository<Ticket, Long> {
     })
     Optional<Ticket> findById(Long id);
 
-    @Lock(LockModeType.PESSIMISTIC_WRITE)
-    @EntityGraph(attributePaths = {
-        "submittedBy",
-        "submittedBy.profile",
-        "images",
-        "assignments",
-        "assignments.technician",
-        "assignments.technician.profile"
-    })
-    @Query("select distinct ticket from Ticket ticket where ticket.id = :id")
-    Optional<Ticket> findByIdForUpdate(@Param("id") Long id);
+    // Lock only the ticket row; locking a query that fetches collections can be deferred
+    // by Hibernate and allow concurrent image uploads or reassignment to race.
+    @Query(value = "SELECT id FROM tickets WHERE id = :id FOR UPDATE", nativeQuery = true)
+    Optional<Long> lockIdForUpdate(@Param("id") Long id);
+
+    default Optional<Ticket> findByIdForUpdate(Long id) {
+        return lockIdForUpdate(id).flatMap(this::findById);
+    }
 
     @EntityGraph(attributePaths = {
         "submittedBy",

@@ -83,7 +83,7 @@ for the canonical FR01–FR20 mapping, workflow rules, and demonstration steps.
 
 ## Local Development
 
-Requirement: Java 21.
+Requirement: Java 21 JDK.
 
 ### One-time local configuration
 
@@ -187,23 +187,24 @@ and are removed after successful registration.
 ### Open the front-end
 
 From the repository root, serve the front-end over HTTP so browser sessions and
-API calls behave consistently.
-
-Windows:
-
-```powershell
-py -m http.server 5500 --directory frontend
-```
-
-macOS or Linux:
+API calls behave consistently. The Java 21 JDK includes `jwebserver`; this command
+works in Windows PowerShell and macOS/Linux Bash:
 
 ```bash
-python3 -m http.server 5500 --directory frontend
+jwebserver -b 127.0.0.1 -p 5500 -d "$PWD/frontend"
 ```
+
+The `-d` argument needs an absolute path, which `$PWD/frontend` supplies.
+Python is an optional alternative: use
+`py -m http.server 5500 --directory frontend` on Windows or
+`python3 -m http.server 5500 --directory frontend` on macOS/Linux.
 
 Open `http://localhost:5500/index.html`. Every team member starts both commands
 on their own computer. Separate browsers or private windows can be used to
-demonstrate different signed-in users on the same computer.
+demonstrate different signed-in users on the same computer. This local setup
+uses ports 5500 and 8080. Registration emails require the configured Brevo
+API key and verified sender; Google Maps location selection requires its
+browser key, while manual location entry works without Maps.
 
 ### Enable Google Maps location selection
 

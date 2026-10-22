@@ -69,6 +69,7 @@ public class DataInitializer implements CommandLineRunner {
         migrateManagerAssignments();
         ensureAdministrator();
         migrateTicketStatuses();
+        migrateEventTypeColumns();
         backfillTicketHistory();
     }
 
@@ -334,6 +335,12 @@ public class DataInitializer implements CommandLineRunner {
                 """);
         jdbcTemplate.update(
                 "UPDATE tickets SET status = 'SUBMITTED' WHERE CAST(status AS VARCHAR) = 'PENDING'");
+    }
+
+    /** Keep persisted event types open to future values when upgrading older H2 databases. */
+    void migrateEventTypeColumns() {
+        jdbcTemplate.execute("ALTER TABLE ticket_history ALTER COLUMN event_type VARCHAR(40) NOT NULL");
+        jdbcTemplate.execute("ALTER TABLE in_app_notifications ALTER COLUMN type VARCHAR(40) NOT NULL");
     }
 
     private void backfillTicketHistory() {
