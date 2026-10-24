@@ -62,6 +62,8 @@ test('only the student owner of a completed request sees rating controls', () =>
   assert.match(owner, /reviews\.html\?technicianId=22/);
   assert.doesNotMatch(owner, /<script>/);
   assert.doesNotMatch(p.run('renderDetailActions(ticket, technician)'), /ticket-review-form/);
+  p.run("ticket.status = 'CLOSED'");
+  assert.match(p.run('renderDetailActions(ticket, student)'), /ticket-review-form/);
   p.run("ticket.status = 'IN_PROGRESS'");
   assert.doesNotMatch(p.run('renderDetailActions(ticket, student)'), /ticket-review-form/);
   p.run("ticket.status = 'COMPLETED'; ticket.assignedTechnicianId = 10");
@@ -92,6 +94,104 @@ test('rating submission sends score and optional text once and validates the sta
   elements['ticket-review-score'].value = '0';
   await p.run('saveTicketReview({preventDefault() {}}, 7)');
   assert.equal(requests.length, 1);
+});
+
+test('editing a moderated rating explains that its comment remains hidden', async () => {
+  const calls = [];
+  const score = element({ value: '4' });
+  const comment = element({ value: 'Updated comment' });
+  const message = element();
+  const p = page({
+    'ticket-review-form': element({ querySelectorAll: () => [score, comment] }),
+    'ticket-review-score': score,
+    'ticket-review-comment': comment,
+    'ticket-review-save': element(),
+    'ticket-review-message': message
+  }, async (url, options) => {
+    calls.push({ url, options });
+    if (url.endsWith('/reviews/me/ban')) {
+      return { ok: true, status: 200, json: async () => ({ banned: false }) };
+    }
+    return { ok: true, status: 200, json: async () => ({
+      score: 4, comment: 'Updated comment', visibility: 'TEXT_REMOVED'
+    }) };
+  });
+  p.context.student = { id: 10, roles: ['GENERAL_USER'], activeRole: 'GENERAL_USER' };
+  p.run('currentWorkspaceUser = student');
+
+  await p.run('loadTicketReview(7)');
+  assert.match(message.textContent, /star rating is visible.*comment is hidden.*administrator/i);
+  score.value = '5';
+  comment.value = 'Revised comment';
+  await p.run('saveTicketReview({ preventDefault() {} }, 7)');
+
+  const saved = calls.find((call) => call.options.method === 'PUT');
+  assert.deepEqual(JSON.parse(saved.options.body), { score: 5, comment: 'Revised comment' });
+  assert.match(message.textContent, /star rating was updated.*comment remains hidden.*administrator/i);
+  assert.doesNotMatch(message.textContent, /public|can be edited at any time/i);
+});
+
+test('student rating controls follow the current suspension state', async () => {
+  const score = element();
+  const comment = element();
+  const save = element();
+  const form = element({ querySelectorAll: () => [score, comment, save] });
+  const message = element();
+  let suspended = true;
+  const p = page({
+    'ticket-review-form': form,
+    'ticket-review-score': score,
+    'ticket-review-comment': comment,
+    'ticket-review-save': save,
+    'ticket-review-message': message
+  }, async (url) => url.endsWith('/reviews/me/ban')
+    ? { ok: true, status: 200, json: async () => ({ banned: suspended, reason: 'Repeated abuse' }) }
+    : { ok: false, status: 404 });
+
+  await p.run('loadTicketReview(7)');
+  assert.equal(score.disabled, true);
+  assert.equal(comment.disabled, true);
+  assert.equal(save.disabled, true);
+  assert.match(message.textContent, /suspended.*Repeated abuse/i);
+
+  suspended = false;
+  await p.run('loadTicketReview(7)');
+  assert.equal(score.disabled, false);
+  assert.equal(comment.disabled, false);
+  assert.equal(save.disabled, false);
+  assert.match(message.textContent, /public after you save/);
+});
+
+test('administrator can suspend rating without an expiry and sees updated access', async () => {
+  const calls = [];
+  const elements = {
+    'rating-ban-student': element({ value: '10' }),
+    'rating-ban-reason': element({ value: '  1233  ' }),
+    'rating-ban-expiry': element({ value: '' }),
+    'rating-ban-message': element(),
+    'rating-ban-state': element(),
+    'rating-ban-save': element(),
+    'rating-unban': element()
+  };
+  const p = page(elements, async (url, options) => {
+    calls.push({ url, options });
+    return { ok: true, status: 200, json: async () => ({ banned: true, reason: '1233' }) };
+  });
+  p.context.admin = { id: 1, roles: ['ADMINISTRATOR'], activeRole: 'ADMINISTRATOR' };
+  p.run('currentWorkspaceUser = admin');
+
+  await p.run('banStudentRating({ preventDefault() {} })');
+
+  assert.equal(calls.length, 2);
+  assert.match(calls[0].url, /admin\/reviews\/students\/10\/ban$/);
+  assert.equal(calls[0].options.method, 'POST');
+  assert.equal(calls[0].options.headers['X-Active-Role'], 'ADMINISTRATOR');
+  assert.deepEqual(JSON.parse(calls[0].options.body), { reason: '1233' });
+  assert.equal(calls[1].options.method ?? 'GET', 'GET');
+  assert.match(elements['rating-ban-state'].textContent, /suspended/i);
+  assert.match(elements['rating-ban-message'].textContent, /suspended/i);
+  assert.equal(elements['rating-unban'].disabled, false);
+  assert.equal(elements['rating-ban-save'].disabled, false);
 });
 
 test('public review markup stays anonymous, hides ticket details, and escapes comments', () => {

@@ -1285,7 +1285,7 @@ function renderDetailActions(ticket, user) {
         <p id="detail-owner-message" class="detail-message" role="status"></p>
       </section>`);
   }
-  if (isTicketOwner(ticket, user) && ticket.status === 'COMPLETED' && ticket.assignedTechnicianId
+  if (isTicketOwner(ticket, user) && ['COMPLETED', 'CLOSED'].includes(ticket.status) && ticket.assignedTechnicianId
       && String(ticket.assignedTechnicianId) !== String(user.id)) {
     panels.push(`
       <section class="action-panel" aria-labelledby="ticket-review-title">
@@ -1304,7 +1304,7 @@ function renderDetailActions(ticket, user) {
         </form>
         <p id="ticket-review-message" class="detail-message" role="status" aria-live="polite">Loading your rating...</p>
       </section>`);
-  } else if (isTicketOwner(ticket, user) && ticket.status === 'COMPLETED'
+  } else if (isTicketOwner(ticket, user) && ['COMPLETED', 'CLOSED'].includes(ticket.status)
       && String(ticket.assignedTechnicianId) === String(user.id)) {
     panels.push('<section class="action-panel"><h3>Rating unavailable</h3><p>You cannot rate a repair you completed yourself.</p></section>');
   }
@@ -1549,6 +1549,7 @@ async function loadTicketReview(ticketId) {
   setText(message, ban.banned
     ? `Your rating access is suspended${ban.expiresAt ? ` until ${formatDate(ban.expiresAt)}` : ''}. ${ban.reason ?? ''}`
     : review?.visibility === 'REMOVED' ? 'The previous rating was removed. You can submit a new one.'
+      : review?.visibility === 'TEXT_REMOVED' ? 'Your star rating is visible, but your comment is hidden until an administrator restores it.'
       : review ? 'You can edit your rating at any time.' : 'Your rating will be public after you save it.');
 }
 
@@ -1569,10 +1570,14 @@ async function saveTicketReview(event, ticketId) {
   if (button) button.disabled = true;
   setText(message, 'Saving rating...');
   try {
-    await fetchJson(`/reviews/tickets/${ticketId}/mine`, 'Saving rating failed', {
+    const saved = await fetchJson(`/reviews/tickets/${ticketId}/mine`, 'Saving rating failed', {
       method: 'PUT', body: JSON.stringify({ score, comment })
     });
-    setText(message, 'Your rating is saved and can be edited at any time.');
+    setText(message, saved?.visibility === 'TEXT_REMOVED'
+      ? 'Your star rating was updated. Your comment remains hidden until an administrator restores it.'
+      : saved?.visibility === 'REMOVED'
+        ? 'Your rating was saved but remains hidden until an administrator restores it.'
+        : 'Your rating is saved and can be edited at any time.');
   } catch (error) {
     setText(message, error.message);
   } finally {

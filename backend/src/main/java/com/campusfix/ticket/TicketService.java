@@ -26,6 +26,8 @@ import com.campusfix.user.UserRepository;
 @Service
 public class TicketService {
 
+    private static final int MAX_IMAGES_PER_TICKET = 5;
+
     private final TicketRepository ticketRepository;
     private final TicketHistoryRepository ticketHistoryRepository;
     private final UserRepository userRepository;
@@ -369,7 +371,8 @@ public class TicketService {
     @Transactional
     public CompletionEvidence addCompletionEvidence(
             Long ticketId, User technician, String repairNotes, MultipartFile image) {
-        Ticket ticket = findTicket(ticketId);
+        // Serialize the assignment check with administrator reassignment.
+        Ticket ticket = findTicketForUpdate(ticketId);
         TicketAssignment assignment = ticket.getActiveAssignment();
         if (assignment == null || !assignment.getTechnician().getId().equals(technician.getId())) {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN,
@@ -383,13 +386,17 @@ public class TicketService {
         if (notes == null || notes.isBlank()) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Repair notes are required");
         }
+        if (notes.length() > 2000) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Repair notes must not exceed 2000 characters");
+        }
         try {
             CompletionEvidence evidence = completionEvidenceRepository.save(new CompletionEvidence(
                     ticket, technician, notes, image.getBytes(), image.getContentType()));
             ticket.touch();
             ticketRepository.save(ticket);
             recordHistory(ticket, TicketEventType.COMPLETION_EVIDENCE_ADDED, technician, null,
-                    "Completion evidence #" + evidence.getId(), notes);
+                    "Completion evidence #" + evidence.getId(),
+                    notes.length() > 1000 ? notes.substring(0, 1000) : notes);
             return evidence;
         } catch (IOException exception) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Unable to read evidence image");
@@ -482,6 +489,12 @@ public class TicketService {
             throw new ResponseStatusException(
                     HttpStatus.CONFLICT,
                     "Images can no longer be added because maintenance work has started");
+        }
+
+        if (ticket.getImages().size() >= MAX_IMAGES_PER_TICKET) {
+            throw new ResponseStatusException(
+                    HttpStatus.BAD_REQUEST,
+                    "A request cannot have more than " + MAX_IMAGES_PER_TICKET + " images");
         }
 
         int previousImageCount = ticket.getImages().size();

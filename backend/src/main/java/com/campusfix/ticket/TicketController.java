@@ -35,7 +35,6 @@ import jakarta.validation.Valid;
 public class TicketController {
 
     private static final long MAX_IMAGE_SIZE_BYTES = 15 * 1024 * 1024;
-    private static final int MAX_IMAGES_PER_TICKET = 5;
 
     private final TicketService ticketService;
     private final AccessControlService accessControlService;
@@ -224,16 +223,6 @@ public class TicketController {
         Long requesterId = getRequesterId(session);
         validateImage(image);
 
-        Ticket ticket = ticketService.getTicketForUser(
-                ticketId,
-                requesterId);
-
-        if (ticket.getImages().size() >= MAX_IMAGES_PER_TICKET) {
-            throw new ResponseStatusException(
-                    HttpStatus.BAD_REQUEST,
-                    "A request cannot have more than " + MAX_IMAGES_PER_TICKET + " images");
-        }
-
         ticketService.addTicketImage(ticketId, requesterId, image);
     }
 
@@ -273,7 +262,16 @@ public class TicketController {
         }
 
         String contentType = image.getContentType();
-        if (contentType == null || !contentType.startsWith("image/")) {
+        if (contentType == null || contentType.length() > 100) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "File must be an image");
+        }
+        MediaType mediaType;
+        try {
+            mediaType = MediaType.parseMediaType(contentType);
+        } catch (IllegalArgumentException exception) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "File must be an image");
+        }
+        if (!"image".equalsIgnoreCase(mediaType.getType()) || mediaType.isWildcardSubtype()) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "File must be an image");
         }
     }
