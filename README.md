@@ -1,76 +1,65 @@
-# CampusFix — Campus Maintenance Workflow Platform
+# CampusFix Campus Maintenance Workflow Platform
 
 > CampusFix 校园维修工单与协同管理平台
 
-A full-stack web application for reporting, assigning, tracking, and completing maintenance requests across a university campus.
+CampusFix is a completed university team project connecting requesters, maintenance staff and administrators in one full-stack maintenance workflow. This public repository now includes application source and filtered development history, not only a project introduction.
 
-## Portfolio scope
+Refreshed on **2 November 2026** from the school's committed `main` at [`53e0134`](https://github.sydney.edu.au/2026S2-Object-Oriented-App-Frameworks/ELEC5619-Lab03-Group-03/commit/53e0134e1d416d513db6b89954b0c84e872b2d9f). The source link requires university access. Local uncommitted work is not included. See [source provenance](SOURCE_ORIGIN.md).
 
-This is a public, recruiter-facing summary of my contribution to a private University of Sydney team project. It documents the system and my implementation work without republishing the course repository, teammate-owned source code, local databases, or credentials.
+## Application features
 
-| Item | Summary |
+- Email-verified registration, login/logout, profiles, avatars and multiple account roles.
+- Maintenance requests with categories, location, optional maps and image attachments.
+- Administrator priority setting, assignment, reassignment and maintenance analytics.
+- Technician workspaces, status transitions, completion evidence and audit history.
+- Ticket conversations, role-aware notifications, service ratings and review moderation.
+
+The [requirements and closeout guide](docs/Requirements-Closeout-CN.md) maps FR01–FR20 to the implementation. Completion of the course project does not imply production security certification or verified real-email, maps, load and cross-device performance.
+
+## Technology and structure
+
+| Area | Implementation |
 |---|---|
-| Project context | University of Sydney ELEC5619 team project |
-| My focus | End-to-end identity, access, profile, email-verification, and front-end integration |
-| Front end | HTML, CSS, JavaScript |
-| Back end | Java 21, Spring Boot, REST APIs |
-| Persistence | JPA/Hibernate, H2 |
-| Delivery | Git/GitHub, Gradle, JUnit, Jira/Scrum |
+| Front end | HTML, CSS, JavaScript and browser Fetch APIs |
+| Back end | Java 21, Spring Boot and REST endpoints |
+| Persistence | JPA/Hibernate and local H2 storage |
+| External services | Brevo transactional email; optional Google Maps |
+| Verification | JUnit/Spring integration tests and Node's test runner |
+| Collaboration | Git pull requests, iterative delivery and Jira/Scrum |
 
-## Product problem
+Application code is in `backend/src/` and `frontend/`; tests are in `backend/src/test/` and `frontend/tests/`. Setup scripts are in `scripts/`. See the [architecture notes](docs/ARCHITECTURE.md).
 
-Campus maintenance reporting is often fragmented: users cannot easily see whether an issue has been received, administrators struggle to assign work consistently, and maintenance staff need a clear way to record progress and completion evidence.
+## Run locally
 
-CampusFix centralises that workflow:
+Install a Java 21 JDK and Python 3. Node.js is needed for frontend tests, not for serving the static pages. The Gradle wrapper downloads its pinned build distribution and dependencies.
 
-1. A requester submits a maintenance ticket.
-2. An administrator reviews priority and assigns staff.
-3. Maintenance staff update progress and completion information.
-4. The requester tracks status and provides feedback.
+1. Copy `.env.example` to `backend/.env.local` and replace placeholders with your own local administrator password and service credentials. Never commit that file.
+2. Configure a verified Brevo sender using the [email setup guide](docs/Brevo_Email_Setup_Guide.md). Keep email verification enabled for normal use.
+3. From `backend/`, run `./gradlew bootRun` on macOS/Linux or `.\gradlew.bat bootRun` on Windows. The API runs at `http://localhost:8080`.
+4. From the repository root, run `python -m http.server 5500 --bind 127.0.0.1 --directory frontend`, then open `http://localhost:5500`.
 
-The wider team system implements ticket creation and retrieval, image attachments, priority handling, assignment and reassignment, status transitions, history/audit records, completion evidence, and in-app notifications.
+The application creates a fresh local database. No original users, tickets or database files are published. Decorative background images/video are omitted because their redistribution provenance was not established; the CSS fallback remains. External email and maps need separately configured credentials.
 
-## My implementation contribution
+## Verification
 
-I developed the identity and access slice across the front end and back end rather than working only on page styling.
+Verified on 2 November 2026 against this filtered source: **32 backend tests and 39 frontend tests passed**, with no failures or skips. JavaScript syntax checks also passed.
 
-### Application foundation
+From `backend/`, run `.\gradlew.bat test` on Windows or `./gradlew test` on macOS/Linux. From the repository root:
 
-- Helped establish the separate front-end and Spring Boot back-end development structure.
-- Implemented the `User` persistence model and mapped it to H2 through JPA/Hibernate.
-- Added repository, service, request-model, and controller layers for registration and account lookup.
-- Connected HTML/CSS/JavaScript authentication pages to REST endpoints and configured local CORS behaviour.
+```text
+node --test frontend/tests/closeout.test.cjs frontend/tests/multiple-roles.test.cjs frontend/tests/reviews.test.cjs
+```
 
-### Authentication and access control
+Tests use synthetic accounts and isolated databases. They do not validate delivery to a real mailbox, live maps or production security.
 
-- Implemented registration, input validation, login, logout, and session-aware UI behaviour.
-- Implemented the initial role entities and administrator initialisation; the wider multi-role model was subsequently extended by the team.
-- Separated authentication pages and made login the default entry point.
+## My contribution
 
-### Profile and verification workflow
+I implemented identity/access and profile flows, Brevo integration, role-aware workspaces, ratings/moderation workflows and integration fixes. The wider maintenance system was developed with teammates; I do not claim every component.
 
-- Added user workspace/profile management and profile-picture upload.
-- Integrated registration email verification through Brevo's transactional-email API.
-- Kept the API key server-side through an ignored local environment file and documented safe team setup.
-- Added a shared visual theme across the application pages.
+The latest filtered import preserves **92 source-relevant commits**, including **71 attributed to Tian Liao**. Counts include merges and are not a contribution percentage. See [contribution evidence](docs/CONTRIBUTIONS.md).
 
-The private repository history attributes 65 commits to Tian Liao. Selected evidence is listed in [docs/CONTRIBUTIONS.md](docs/CONTRIBUTIONS.md).
+## Publication boundary
 
-## Architecture
+Team permission covers the retained team-authored source. Real credentials, databases, user records, build caches, private course deliverables and unverified decorative media are excluded from the imported history. Private author emails are replaced while names, dates and development order remain.
 
-The project uses a conventional layered application design with browser, REST, service, persistence, and external-email boundaries. See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
-
-## Skills demonstrated
-
-- Java/Spring Boot REST API development
-- JPA/Hibernate entity and repository design
-- Session-based authentication and role-based access control
-- Input validation, CORS, profile, and file-upload workflows
-- Third-party email API integration and secret isolation
-- HTML/CSS/JavaScript front-end integration
-- Git pull-request collaboration and iterative delivery
-
-## Academic and confidentiality note
-
-The original implementation remains in a private university team repository. This portfolio contains no course source code, real credentials, local database files, or teammate-owned implementation. See [NOTICE.md](NOTICE.md).
-
+The Gradle wrapper is third-party tooling, not my work. Its licence is retained inside the JAR; see [third-party notices](THIRD_PARTY_NOTICES.md). Team code is not assigned a new open-source licence by this publication; see [NOTICE.md](NOTICE.md).

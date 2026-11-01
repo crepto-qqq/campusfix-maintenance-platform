@@ -1,0 +1,147 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Profile | CampusFix</title>
+    <link rel="stylesheet" href="./css/styles.css">
+    <link rel="stylesheet" href="./css/theme.css?v=20261021-polish">
+  </head>
+  <body class="app-page profile-page" data-page="profile">
+    <a class="skip-link" href="#main-content">Skip to main content</a>
+
+    <div class="app-shell">
+      <aside id="app-sidebar" class="app-sidebar" aria-label="Primary navigation">
+        <a class="app-brand" href="./workspace.html" aria-label="CampusFix dashboard">
+          <span class="app-brand-mark" aria-hidden="true">CF</span>
+          <span class="app-brand-copy">
+            <strong>CampusFix</strong>
+            <small>Maintenance portal</small>
+          </span>
+        </a>
+
+        <nav class="app-nav" aria-label="Workspace">
+          <a class="app-nav-link" href="./workspace.html">
+            <span aria-hidden="true">⌂</span>
+            <span>Dashboard</span>
+          </a>
+          <a class="app-nav-link" href="./requests.html">
+            <span aria-hidden="true">▤</span>
+            <span>Requests</span>
+          </a>
+          <a id="new-request-nav" class="app-nav-link requester-only" href="./request-form.html" data-requires-role="GENERAL_USER" hidden>
+            <span aria-hidden="true">＋</span>
+            <span>New request</span>
+          </a>
+          <a id="admin-link" class="app-nav-link" href="./admin.html" hidden>
+            <span aria-hidden="true">♙</span>
+            <span>Manage users</span>
+          </a>
+          <a class="app-nav-link is-active" href="./profile.html" aria-current="page">
+            <span aria-hidden="true">○</span>
+            <span>Profile</span>
+          </a>
+        </nav>
+
+        <div class="app-sidebar-footer">
+          <div class="current-user">
+            <span class="current-user-label">Signed in as</span>
+            <span id="workspace-role" class="role-badge" hidden></span>
+          </div>
+          <button id="logout-button" class="app-nav-link logout-button" type="button">
+            <span aria-hidden="true">↪</span>
+            <span>Log out</span>
+          </button>
+        </div>
+      </aside>
+
+      <button id="sidebar-backdrop" class="sidebar-backdrop" type="button" aria-label="Close navigation" tabindex="-1"></button>
+
+      <div class="app-frame">
+        <header class="app-topbar">
+          <button id="sidebar-toggle" class="app-menu-button" type="button" aria-controls="app-sidebar" aria-expanded="false" aria-label="Open navigation">
+            <span aria-hidden="true">☰</span>
+          </button>
+          <div class="app-topbar-context">
+            <span>Account</span>
+            <strong>Profile</strong>
+          </div>
+          <a class="topbar-profile-link is-current" href="./profile.html" aria-current="page">View profile</a>
+        </header>
+
+        <main id="main-content" class="app-content">
+          <section id="profile-page" aria-labelledby="profile-title">
+            <header class="page-header">
+              <div class="page-heading">
+                <p class="page-eyebrow">Account settings</p>
+                <h1 id="profile-title">Your profile</h1>
+                <p class="page-description">Keep your contact details current so the maintenance team can reach you.</p>
+              </div>
+            </header>
+
+            <p id="auth-message" class="app-status-message" role="status" aria-live="polite">Loading profile…</p>
+
+            <div class="settings-layout">
+              <aside class="surface profile-summary" aria-labelledby="profile-summary-title">
+                <div class="profile-avatar-card">
+                  <div class="profile-avatar-placeholder" aria-hidden="true">CF</div>
+                  <img id="profile-avatar" class="profile-avatar" alt="Your profile picture" hidden>
+                  <div>
+                    <h2 id="profile-summary-title">Profile picture</h2>
+                    <p>Use a clear photo to help staff recognise your account.</p>
+                  </div>
+                </div>
+
+                <form id="avatar-form" class="avatar-form" enctype="multipart/form-data">
+                  <label for="avatar-file">Choose a new picture</label>
+                  <input id="avatar-file" name="avatar" type="file" accept="image/*" required>
+                  <button type="submit" class="secondary-button">Upload picture</button>
+                </form>
+
+                <dl class="profile-facts">
+                  <div><dt>User ID</dt><dd id="profile-id"></dd></div>
+                  <div><dt>Email</dt><dd id="profile-email"></dd></div>
+                  <div><dt>University identity</dt><dd id="profile-identity-type"></dd></div>
+                  <div><dt>Current role</dt><dd id="profile-active-role"></dd></div>
+                  <div><dt>Available roles</dt><dd id="profile-role"></dd></div>
+                </dl>
+              </aside>
+
+              <section class="surface settings-section" aria-labelledby="profile-details-title">
+                <header class="surface-header">
+                  <div class="surface-heading">
+                    <h2 id="profile-details-title">Personal details</h2>
+                    <p>These details are visible only to people who need them to manage your requests.</p>
+                  </div>
+                </header>
+
+                <form id="profile-form" class="profile-form">
+                  <div class="form-field">
+                    <label for="profile-name">Name</label>
+                    <input id="profile-name" name="name" type="text" maxlength="100" autocomplete="name" required>
+                  </div>
+
+                  <div class="form-field">
+                    <label for="contact-information">Contact information <span class="optional-label">Optional</span></label>
+                    <input id="contact-information" name="contactInformation" type="text" maxlength="255" autocomplete="tel" placeholder="Phone number or preferred contact method">
+                  </div>
+
+                  <div class="form-field">
+                    <label for="profile-details">Profile details <span class="optional-label">Optional</span></label>
+                    <textarea id="profile-details" name="profileDetails" rows="6" maxlength="1000" placeholder="Add any useful details about your campus role or availability."></textarea>
+                  </div>
+
+                  <div class="form-actions">
+                    <button type="submit" class="primary-button">Save changes</button>
+                  </div>
+                </form>
+              </section>
+            </div>
+          </section>
+        </main>
+      </div>
+    </div>
+
+    <script src="./js/app.js?v=20261022-tested"></script>
+  </body>
+</html>

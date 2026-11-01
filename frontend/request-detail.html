@@ -1,0 +1,237 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Request Details | CampusFix</title>
+    <link rel="stylesheet" href="./css/styles.css">
+    <link rel="stylesheet" href="./css/theme.css?v=20261021-polish">
+  </head>
+  <body class="app-page" data-page="request-detail">
+    <a class="skip-link" href="#main-content">Skip to main content</a>
+
+    <div class="app-shell">
+      <aside id="app-sidebar" class="app-sidebar" aria-label="Primary navigation">
+        <a class="app-brand" href="./workspace.html" aria-label="CampusFix dashboard">
+          <span class="app-brand-mark" aria-hidden="true">CF</span>
+          <span class="app-brand-copy">
+            <strong>CampusFix</strong>
+            <small>Maintenance portal</small>
+          </span>
+        </a>
+
+        <nav class="app-nav" aria-label="Workspace">
+          <a class="app-nav-link" href="./workspace.html">
+            <span aria-hidden="true">⌂</span>
+            <span>Dashboard</span>
+          </a>
+          <a class="app-nav-link is-active" href="./requests.html" aria-current="page">
+            <span aria-hidden="true">▤</span>
+            <span>Requests</span>
+          </a>
+          <a id="new-request-nav" class="app-nav-link requester-only" href="./request-form.html" data-requires-role="GENERAL_USER" hidden>
+            <span aria-hidden="true">＋</span>
+            <span>New request</span>
+          </a>
+          <a id="admin-link" class="app-nav-link" href="./admin.html" hidden>
+            <span aria-hidden="true">♙</span>
+            <span>Manage users</span>
+          </a>
+          <a class="app-nav-link" href="./profile.html">
+            <span aria-hidden="true">○</span>
+            <span>Profile</span>
+          </a>
+        </nav>
+
+        <div class="app-sidebar-footer">
+          <div class="current-user">
+            <span class="current-user-label">Signed in as</span>
+            <span id="workspace-role" class="role-badge" hidden></span>
+          </div>
+          <button id="logout-button" class="app-nav-link logout-button" type="button">
+            <span aria-hidden="true">↪</span>
+            <span>Log out</span>
+          </button>
+          <p id="auth-message" class="app-status-message" role="status" aria-live="polite"></p>
+        </div>
+      </aside>
+
+      <button id="sidebar-backdrop" class="sidebar-backdrop" type="button" aria-label="Close navigation" tabindex="-1"></button>
+
+      <div class="app-frame">
+        <header class="app-topbar">
+          <button id="sidebar-toggle" class="app-menu-button" type="button" aria-controls="app-sidebar" aria-expanded="false" aria-label="Open navigation">
+            <span aria-hidden="true">☰</span>
+          </button>
+          <div class="app-topbar-context">
+            <span>Requests</span>
+            <strong>Request details</strong>
+          </div>
+          <a class="topbar-profile-link" href="./profile.html">View profile</a>
+        </header>
+
+        <main id="main-content" class="app-content">
+          <section id="request-detail" aria-labelledby="request-detail-title">
+            <a class="back-link" href="./requests.html"><span aria-hidden="true">←</span> Back to requests</a>
+
+            <p id="request-detail-message" class="app-status-message" role="status" aria-live="polite">Loading request…</p>
+
+            <article id="request-detail-content" class="request-detail" hidden>
+              <header class="request-detail-header">
+                <div class="request-detail-heading">
+                  <p id="request-detail-reference" class="page-eyebrow">Maintenance request</p>
+                  <h1 id="request-detail-title">Request details</h1>
+                </div>
+                <div class="request-detail-badges" aria-label="Request classification">
+                  <span id="request-detail-priority" class="priority-badge"></span>
+                  <span id="request-detail-status" class="status-badge"></span>
+                </div>
+              </header>
+
+              <div class="request-detail-layout">
+                <div class="request-detail-main">
+                  <section class="surface detail-section" aria-labelledby="request-description-title">
+                    <header class="surface-header">
+                      <div class="surface-heading">
+                        <h2 id="request-description-title">Issue details</h2>
+                      </div>
+                    </header>
+                    <p id="request-detail-description" class="request-description"></p>
+                  </section>
+
+                  <section id="request-images-section" class="surface detail-section" aria-labelledby="request-images-title" hidden>
+                    <header class="surface-header">
+                      <div class="surface-heading">
+                        <h2 id="request-images-title">Issue photos</h2>
+                        <p>Select an image to view it full size.</p>
+                      </div>
+                    </header>
+                    <div id="request-image-gallery" class="media-gallery"></div>
+                  </section>
+
+                  <section id="completion-evidence-section" class="surface detail-section" aria-labelledby="completion-evidence-title" hidden>
+                    <header class="surface-header">
+                      <div class="surface-heading">
+                        <h2 id="completion-evidence-title">Completion evidence</h2>
+                      </div>
+                    </header>
+                    <div id="completion-evidence-list" class="evidence-list"></div>
+                  </section>
+
+                  <details id="request-activity-panel" class="surface detail-section activity-panel">
+                    <summary id="request-activity-toggle">
+                      <span>
+                        <span class="section-eyebrow">Audit trail</span>
+                        <strong>View activity</strong>
+                      </span>
+                      <span aria-hidden="true">⌄</span>
+                    </summary>
+                    <p id="request-activity-message" class="app-status-message" role="status" aria-live="polite"></p>
+                    <ol id="request-activity-list" class="activity-timeline"></ol>
+                  </details>
+                </div>
+
+                <aside class="request-detail-sidebar" aria-label="Request information and actions">
+                  <section class="surface detail-section" aria-labelledby="request-information-title">
+                    <header class="surface-header">
+                      <div class="surface-heading">
+                        <h2 id="request-information-title">Request information</h2>
+                      </div>
+                    </header>
+                    <dl class="request-metadata">
+                      <div><dt>Category</dt><dd id="request-detail-category"></dd></div>
+                      <div><dt>Location</dt><dd id="request-detail-location"></dd></div>
+                      <div><dt>Suggested urgency</dt><dd id="request-detail-urgency"></dd></div>
+                      <div><dt>Operational priority</dt><dd id="request-detail-operational-priority"></dd></div>
+                      <div><dt>Assigned technician</dt><dd id="request-detail-technician"></dd></div>
+                      <div><dt>Submitted by</dt><dd id="request-detail-submitter"></dd></div>
+                      <div><dt>Submitted</dt><dd id="request-detail-created-at"></dd></div>
+                    </dl>
+                  </section>
+
+                  <section id="request-actions" class="surface detail-section action-panel" aria-labelledby="request-actions-title">
+                    <header class="surface-header">
+                      <div class="surface-heading">
+                        <p class="section-eyebrow">Next step</p>
+                        <h2 id="request-actions-title">Actions</h2>
+                      </div>
+                    </header>
+
+                    <div id="request-primary-action" class="primary-action-group">
+                      <button id="start-work-button" type="button" class="primary-button" hidden>Start work</button>
+                      <button id="complete-request-button" type="button" class="primary-button" hidden>Complete request</button>
+                      <a id="edit-request-link" class="button primary-button" href="./request-form.html" hidden>Edit request</a>
+                    </div>
+                    <p id="request-action-message" class="app-status-message" role="status" aria-live="polite"></p>
+
+                    <form id="request-priority-form" class="action-form" hidden>
+                      <h3>Operational priority</h3>
+                      <label for="request-priority">Priority</label>
+                      <select id="request-priority" name="priority" required>
+                        <option value="">Select priority</option>
+                        <option value="LOW">Low</option>
+                        <option value="MEDIUM">Medium</option>
+                        <option value="HIGH">High</option>
+                        <option value="CRITICAL">Critical</option>
+                      </select>
+                      <label for="request-priority-reason">Reason <span class="optional-label">Optional</span></label>
+                      <textarea id="request-priority-reason" name="reason" rows="3" maxlength="1000"></textarea>
+                      <button id="request-priority-save" type="submit" class="secondary-button">Save priority</button>
+                      <p id="request-priority-message" class="app-status-message" role="status" aria-live="polite"></p>
+                    </form>
+
+                    <form id="request-assignment-form" class="action-form" hidden>
+                      <h3>Assign technician</h3>
+                      <label for="request-technician">Maintenance staff</label>
+                      <select id="request-technician" name="technicianId" required>
+                        <option value="">Select a technician</option>
+                      </select>
+                      <button id="request-assignment-save" type="submit" class="primary-button">Assign request</button>
+                      <p id="request-assignment-message" class="app-status-message" role="status" aria-live="polite"></p>
+                    </form>
+
+                    <form id="request-reassignment-form" class="action-form" hidden>
+                      <h3>Reassign technician</h3>
+                      <label for="request-reassignment-technician">Maintenance staff</label>
+                      <select id="request-reassignment-technician" name="technicianId" required>
+                        <option value="">Select a different technician</option>
+                      </select>
+                      <label for="request-reassignment-reason">Reason</label>
+                      <textarea id="request-reassignment-reason" name="reason" rows="3" maxlength="1000" required></textarea>
+                      <button id="request-reassignment-save" type="submit" class="secondary-button">Reassign request</button>
+                      <p id="request-reassignment-message" class="app-status-message" role="status" aria-live="polite"></p>
+                    </form>
+
+                    <form id="completion-evidence-form" class="action-form" hidden>
+                      <h3>Add completion evidence</h3>
+                      <label for="completion-notes">Repair notes</label>
+                      <textarea id="completion-notes" name="repairNotes" rows="4" maxlength="2000" required></textarea>
+                      <label for="completion-image">Evidence image</label>
+                      <input id="completion-image" name="image" type="file" accept="image/*" required>
+                      <button id="completion-evidence-save" type="submit" class="secondary-button">Upload evidence</button>
+                      <p id="completion-evidence-message" class="app-status-message" role="status" aria-live="polite"></p>
+                    </form>
+
+                    <div id="request-secondary-actions" class="secondary-action-group">
+                      <button id="cancel-request-button" type="button" class="danger-button" hidden>Cancel request</button>
+                    </div>
+                  </section>
+                </aside>
+              </div>
+            </article>
+
+            <dialog id="request-image-viewer" class="image-viewer" aria-labelledby="request-image-viewer-title">
+              <div class="image-viewer-header">
+                <h2 id="request-image-viewer-title">Issue photo</h2>
+                <form method="dialog"><button class="icon-button" type="submit" aria-label="Close image viewer">×</button></form>
+              </div>
+              <img id="request-image-viewer-image" alt="Selected issue photo">
+            </dialog>
+          </section>
+        </main>
+      </div>
+    </div>
+
+    <script src="./js/app.js?v=20261022-tested"></script>
+  </body>
+</html>

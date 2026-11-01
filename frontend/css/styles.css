@@ -1,0 +1,679 @@
+* {
+  box-sizing: border-box;
+}
+
+[hidden] {
+  display: none !important;
+}
+
+body {
+  margin: 0;
+  font-family: Arial, sans-serif;
+  color: #222;
+  background: #f5f5f5;
+}
+
+.container {
+  width: min(90%, 960px);
+  margin: 80px auto;
+  padding: 32px;
+  background: #fff;
+  border-radius: 8px;
+}
+
+form {
+  max-width: 420px;
+  display: grid;
+  gap: 12px;
+}
+
+label {
+  font-weight: bold;
+}
+
+input,
+textarea,
+select {
+  width: 100%;
+  padding: 10px;
+  border: 1px solid #bbb;
+  border-radius: 4px;
+  font: inherit;
+}
+
+button {
+  padding: 10px 16px;
+  border: 0;
+  border-radius: 4px;
+  color: #fff;
+  background: #1769aa;
+  font: inherit;
+  cursor: pointer;
+}
+
+#registration-message {
+  min-height: 24px;
+  margin: 0;
+}
+
+#logout-button {
+  margin-top: 16px;
+}
+
+.workspace-container {
+  width: min(90%, 960px);
+  margin: 40px auto;
+}
+
+.workspace-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 24px;
+}
+
+.workspace-header h1 {
+  margin: 0;
+}
+
+.workspace-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.workspace-profile-button {
+  display: inline-block;
+  padding: 10px 20px;
+  border-radius: 4px;
+  color: #fff;
+  background: #1769aa;
+  text-decoration: none;
+}
+
+.role-badge {
+  display: inline-block;
+  padding: 6px 12px;
+  border-radius: 999px;
+  color: #fff;
+  background: #444;
+  font-size: 0.9rem;
+}
+
+.role-general_user {
+  background: #1769aa;
+}
+
+.role-maintenance_staff {
+  background: #6f42c1;
+}
+
+.role-administrator {
+  background: #b02a37;
+}
+
+.role-manager {
+  background: #1f7a55;
+}
+
+.field-help {
+  margin: -4px 0 4px;
+  color: #666;
+  font-size: 0.85rem;
+}
+
+.verification-code-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 12px;
+  align-items: end;
+}
+
+.verification-code-row label {
+  display: block;
+  margin-bottom: 12px;
+}
+
+.verification-code-row button {
+  white-space: nowrap;
+}
+
+button:disabled {
+  cursor: not-allowed;
+  opacity: 0.65;
+}
+
+.table-scroll {
+  overflow-x: auto;
+}
+
+.admin-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.admin-table th,
+.admin-table td {
+  padding: 12px;
+  border-bottom: 1px solid #ddd;
+  text-align: left;
+  vertical-align: middle;
+}
+
+.admin-table th {
+  background: #f3f6f8;
+}
+
+.admin-table select {
+  min-width: 170px;
+}
+
+.workspace-header-actions #logout-button {
+  margin-top: 0;
+}
+
+.card {
+  margin-bottom: 24px;
+  padding: 24px;
+  background: #fff;
+  border-radius: 8px;
+}
+
+.card h2 {
+  margin-top: 0;
+}
+
+#ticket-form {
+  max-width: none;
+}
+
+.secondary-button {
+  display: inline-block;
+  padding: 10px 16px;
+  border-radius: 4px;
+  color: #fff;
+  background: #666;
+  cursor: pointer;
+  border: 0;
+  font: inherit;
+}
+
+.secondary-danger {
+  background: #b02a37;
+}
+
+#ticket-form-actions {
+  display: flex;
+  gap: 12px;
+}
+
+#ticket-message {
+  min-height: 24px;
+  margin: 0;
+}
+
+.tickets-list {
+  display: grid;
+  gap: 16px;
+}
+
+.ticket-card {
+  padding: 16px;
+  border: 1px solid #ddd;
+  border-radius: 8px;
+}
+
+.ticket-card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.ticket-card-header h3 {
+  margin: 0;
+}
+
+.status-badge {
+  flex-shrink: 0;
+  padding: 4px 10px;
+  border-radius: 999px;
+  color: #fff;
+  font-size: 0.8rem;
+}
+
+.status-submitted {
+  background: #f0ad4e;
+}
+
+.status-assigned {
+  background: #5bc0de;
+}
+
+.status-in_progress {
+  background: #1769aa;
+}
+
+.status-completed {
+  background: #28a745;
+}
+
+.status-closed {
+  background: #1f7a55;
+}
+
+.status-reopened {
+  background: #d97706;
+}
+
+.status-cancelled {
+  background: #999;
+}
+
+.ticket-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 8px 0;
+  color: #555;
+  font-size: 0.9rem;
+}
+
+.urgency-low {
+  color: #28a745;
+  font-weight: bold;
+}
+
+.urgency-medium {
+  color: #f0ad4e;
+  font-weight: bold;
+}
+
+.urgency-high {
+  color: #d9534f;
+  font-weight: bold;
+}
+
+.urgency-emergency {
+  color: #b02a37;
+  font-weight: bold;
+}
+
+.ticket-priority {
+  margin: 8px 0;
+}
+
+.priority-unset {
+  color: #777;
+}
+
+.priority-low {
+  color: #287d3c;
+  font-weight: bold;
+}
+
+.priority-medium {
+  color: #b46900;
+  font-weight: bold;
+}
+
+.priority-high {
+  color: #c0392b;
+  font-weight: bold;
+}
+
+.priority-critical {
+  color: #8b0000;
+  font-weight: bold;
+  text-transform: uppercase;
+}
+
+.ticket-description {
+  white-space: pre-wrap;
+  margin: 8px 0;
+}
+
+.ticket-dates {
+  color: #777;
+  font-size: 0.85rem;
+  margin: 8px 0;
+}
+
+.ticket-images {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 8px 0;
+}
+
+.ticket-image-wrapper img {
+  width: 120px;
+  height: 120px;
+  object-fit: cover;
+  border-radius: 4px;
+  border: 1px solid #ddd;
+}
+
+.ticket-card-actions {
+  display: flex;
+  gap: 12px;
+  margin-top: 12px;
+}
+
+.ticket-edit-button {
+  padding: 8px 16px;
+  border: 0;
+  border-radius: 4px;
+  color: #fff;
+  background: #1769aa;
+  cursor: pointer;
+  font: inherit;
+}
+
+.ticket-cancel-button {
+  padding: 8px 16px;
+  border: 0;
+  border-radius: 4px;
+  color: #fff;
+  background: #b02a37;
+  cursor: pointer;
+  font: inherit;
+}
+
+.ticket-history-button {
+  padding: 8px 16px;
+  border: 0;
+  border-radius: 4px;
+  color: #fff;
+  background: #555;
+  cursor: pointer;
+  font: inherit;
+}
+
+.ticket-history {
+  margin-top: 16px;
+  padding-top: 16px;
+  border-top: 1px solid #ddd;
+}
+
+.priority-management {
+  margin-top: 16px;
+  padding-top: 16px;
+  border-top: 1px solid #ddd;
+}
+
+.priority-management > label {
+  display: block;
+  margin-bottom: 8px;
+  font-weight: bold;
+}
+
+.priority-management-controls {
+  display: grid;
+  grid-template-columns: minmax(150px, 0.8fr) minmax(220px, 2fr) auto;
+  gap: 8px;
+  align-items: end;
+}
+
+.priority-management-controls select,
+.priority-management-controls input {
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.ticket-priority-save {
+  white-space: nowrap;
+}
+
+.ticket-priority-message {
+  min-height: 20px;
+  margin: 8px 0 0;
+}
+
+.ticket-assignment {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 8px 0;
+}
+
+.assignment-unassigned {
+  color: #777;
+}
+
+.assignment-time {
+  flex-basis: 100%;
+  color: #777;
+  font-size: 0.85rem;
+}
+
+.assignment-management {
+  margin-top: 16px;
+  padding-top: 16px;
+  border-top: 1px solid #ddd;
+}
+
+.assignment-management > label {
+  display: block;
+  margin-bottom: 8px;
+  font-weight: bold;
+}
+
+.assignment-management-controls {
+  display: grid;
+  grid-template-columns: minmax(240px, 1fr) auto;
+  gap: 8px;
+  align-items: end;
+}
+
+.assignment-management-controls select {
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.reassignment-management .assignment-management-controls {
+  grid-template-columns: minmax(200px, 1fr) minmax(200px, 1fr) auto;
+}
+
+.reassignment-management input {
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.ticket-assignment-save,
+.ticket-reassignment-save {
+  white-space: nowrap;
+}
+
+.ticket-assignment-message,
+.ticket-reassignment-message {
+  min-height: 20px;
+  margin: 8px 0 0;
+}
+
+.status-management {
+  margin-top: 16px;
+  padding-top: 16px;
+  border-top: 1px solid #ddd;
+}
+
+.ticket-status-save {
+  white-space: nowrap;
+}
+
+.ticket-status-message {
+  min-height: 20px;
+  margin: 8px 0 0;
+}
+
+.priority-summary {
+  margin: 16px 0 20px;
+  padding: 16px;
+  border: 1px solid #d8e0e8;
+  border-radius: 6px;
+  background: #f7f9fb;
+}
+
+.priority-summary h3 {
+  margin: 0 0 12px;
+}
+
+.priority-summary-values {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+  gap: 10px;
+}
+
+.priority-summary-item {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 10px;
+  border: 1px solid #e1e6eb;
+  border-radius: 4px;
+  background: #fff;
+}
+
+.priority-summary-item strong {
+  font-size: 1.15rem;
+}
+
+@media (max-width: 720px) {
+  .priority-management-controls,
+  .assignment-management-controls,
+  .reassignment-management .assignment-management-controls,
+  .verification-code-row {
+    grid-template-columns: 1fr;
+  }
+}
+
+.ticket-history h4 {
+  margin: 0 0 12px;
+}
+
+.history-timeline {
+  display: grid;
+  gap: 12px;
+  margin: 0;
+  padding-left: 24px;
+}
+
+.history-timeline li {
+  padding: 12px;
+  border-left: 3px solid #1769aa;
+  background: #f7f9fb;
+}
+
+.history-heading {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.history-timeline p {
+  margin: 8px 0 0;
+}
+
+.history-timeline pre {
+  overflow-x: auto;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.profile-avatar {
+  width: 160px;
+  height: 160px;
+  margin-bottom: 16px;
+  border-radius: 50%;
+  object-fit: cover;
+}
+
+#avatar-form {
+  margin-bottom: 24px;
+}
+
+.profile-page .container {
+  position: relative;
+  overflow: hidden;
+}
+
+.profile-page .container::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  background-image: url("../images/profile-background.gif");
+  background-position: center;
+  background-repeat: no-repeat;
+  background-size: cover;
+  opacity: 0.2;
+  pointer-events: none;
+}
+
+.profile-page .container > * {
+  position: relative;
+  z-index: 1;
+}
+
+/* Role grants are independent: each checkbox represents one active role. */
+.admin-role-options {
+  border: 0;
+  margin: 0;
+  padding: 0;
+  min-width: 180px;
+}
+
+.admin-role-options legend {
+  font-size: 0.85rem;
+  margin-bottom: 0.5rem;
+}
+
+.admin-role-options label {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin: 0.4rem 0;
+}
+
+.admin-role-options input[type="checkbox"] {
+  width: auto;
+  margin: 0;
+}
+
+.completion-evidence-management {
+  margin-top: 1rem;
+  padding-top: 1rem;
+  border-top: 1px solid #d9dee7;
+}
+
+.completion-evidence-management textarea,
+.completion-evidence-management input[type="file"] {
+  display: block;
+  width: 100%;
+  margin: 0.5rem 0;
+}
+
+.completion-evidence-management textarea {
+  min-height: 90px;
+  resize: vertical;
+}
+
+.completion-evidence-list {
+  margin-top: 1rem;
+}
+
+.completion-evidence-item {
+  margin-top: 0.75rem;
+  padding: 0.75rem;
+  border: 1px solid #d9dee7;
+  border-radius: 8px;
+}
+
+.completion-evidence-item img {
+  display: block;
+  max-width: min(100%, 420px);
+  max-height: 280px;
+  margin-top: 0.5rem;
+  object-fit: contain;
+}

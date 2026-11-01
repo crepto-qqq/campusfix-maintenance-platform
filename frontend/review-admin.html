@@ -1,0 +1,70 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Review Moderation | CampusFix</title>
+    <link rel="stylesheet" href="./css/styles.css">
+    <link rel="stylesheet" href="./css/theme.css?v=20261021-polish">
+  </head>
+  <body class="app-page" data-page="review-admin">
+    <a class="skip-link" href="#main-content">Skip to main content</a>
+    <div class="app-shell">
+      <aside id="app-sidebar" class="app-sidebar" aria-label="Primary navigation">
+        <a class="app-brand" href="./workspace.html" aria-label="CampusFix dashboard">
+          <span class="app-brand-mark" aria-hidden="true">CF</span>
+          <span class="app-brand-copy"><strong>CampusFix</strong><small>Maintenance portal</small></span>
+        </a>
+        <nav class="app-nav" aria-label="Workspace">
+          <a class="app-nav-link" href="./workspace.html"><span aria-hidden="true">⌂</span><span>Dashboard</span></a>
+          <a class="app-nav-link" href="./requests.html"><span aria-hidden="true">▤</span><span>Requests</span></a>
+          <a id="new-request-nav" class="app-nav-link requester-only" href="./request-form.html" data-requires-role="GENERAL_USER" hidden><span aria-hidden="true">＋</span><span>New request</span></a>
+          <a id="admin-link" class="app-nav-link" href="./admin.html" hidden><span aria-hidden="true">♙</span><span>Manage users</span></a>
+          <a class="app-nav-link" href="./profile.html"><span aria-hidden="true">○</span><span>Profile</span></a>
+        </nav>
+        <div class="app-sidebar-footer">
+          <div class="current-user"><span class="current-user-label">Signed in as</span><span id="workspace-role" class="role-badge" hidden></span></div>
+          <button id="logout-button" class="app-nav-link logout-button" type="button"><span aria-hidden="true">↪</span><span>Log out</span></button>
+          <p id="auth-message" class="app-status-message" role="status" aria-live="polite"></p>
+        </div>
+      </aside>
+      <button id="sidebar-backdrop" class="sidebar-backdrop" type="button" aria-label="Close navigation" tabindex="-1"></button>
+      <div class="app-frame">
+        <header class="app-topbar">
+          <button id="sidebar-toggle" class="app-menu-button" type="button" aria-controls="app-sidebar" aria-expanded="false" aria-label="Open navigation"><span aria-hidden="true">☰</span></button>
+          <div class="app-topbar-context"><span>Administration</span><strong>Review moderation</strong></div>
+          <a class="topbar-profile-link" href="./profile.html">View profile</a>
+        </header>
+        <main id="main-content" class="app-content" hidden>
+          <header class="page-header"><div class="page-heading"><p class="page-eyebrow">Service quality</p><h1>Review moderation</h1>
+            <p class="page-description">Review reports, remove or restore content, and manage rating access.</p></div></header>
+          <p id="review-admin-message" class="app-status-message" role="status" aria-live="polite">Loading reviews...</p>
+          <section class="surface review-section" aria-labelledby="review-reports-title">
+            <header class="surface-header"><div class="surface-heading"><h2 id="review-reports-title">Reports awaiting action</h2></div></header>
+            <div id="review-reports-list" class="review-list"></div>
+          </section>
+          <section class="surface review-section" aria-labelledby="review-moderation-title">
+            <header class="surface-header"><div class="surface-heading"><h2 id="review-moderation-title">All ratings and comments</h2></div></header>
+            <div id="admin-reviews-list" class="review-list"></div>
+          </section>
+          <section class="surface review-section" aria-labelledby="review-ban-title">
+            <header class="surface-header"><div class="surface-heading"><h2 id="review-ban-title">Student rating access</h2></div></header>
+            <form id="rating-ban-form" class="action-form">
+              <label for="rating-ban-student">Student</label>
+              <select id="rating-ban-student" required><option value="">Select a student</option></select>
+              <p id="rating-ban-state" class="muted-copy" role="status"></p>
+              <label for="rating-ban-reason">Reason</label>
+              <textarea id="rating-ban-reason" rows="3" maxlength="1000" required></textarea>
+              <label for="rating-ban-expiry">End date <span>(optional; leave blank for permanent)</span></label>
+              <input id="rating-ban-expiry" type="datetime-local">
+              <div class="review-actions"><button id="rating-ban-save" type="submit">Suspend rating access</button>
+                <button id="rating-unban" type="button" class="secondary-button">Restore access</button></div>
+              <p id="rating-ban-message" class="app-status-message" role="status" aria-live="polite"></p>
+            </form>
+          </section>
+        </main>
+      </div>
+    </div>
+    <script src="./js/app.js?v=20261022-tested"></script>
+  </body>
+</html>

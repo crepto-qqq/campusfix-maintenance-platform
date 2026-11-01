@@ -46,8 +46,9 @@ sequenceDiagram
     AuthController->>UserService: Create validated account
     UserService->>Repository: Persist user, identity and role assignment
     Repository-->>UserService: Created account
-    UserService-->>Browser: Authenticated response / session
+    UserService-->>AuthController: Created account
+    AuthController-->>Browser: 201 account created; login required
 ```
 
-Secrets are supplied only to the back end through an ignored local environment file. The public portfolio includes neither the key nor the implementation source.
+Secrets are supplied only to the back end through an ignored local environment file. The public portfolio now includes implementation source, but no real key, account database or runtime user records. Conversations, notifications, ratings/moderation and administrator analytics are included in the completed team snapshot.
 
